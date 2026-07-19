@@ -6,6 +6,7 @@ import Socios from "./components/Socios/Socios";
 import Familias from "./components/Socios/Familias/Familias";
 import Cuotas from "./components/Cuotas/Cuotas";
 import Categorias from "./components/Categorias/Categorias";
+import Configuracion from "./components/Configuracion/Configuracion";
 import { isAuthenticated } from "./components/Global/auth/session";
 
 function ProtectedLayout() {
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/socios/familias" element={<Familias />} />
           <Route path="/cuotas" element={<Cuotas />} />
           <Route path="/categorias" element={<Categorias />} />
+          <Route path="/configuracion" element={<Configuracion />} />
         </Route>
         <Route path="*" element={<Navigate to="/socios" replace />} />
       </Routes>

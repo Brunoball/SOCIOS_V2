@@ -14,6 +14,13 @@ import { useFamilias } from "../hooks/useFamilias";
 import "./Familias.css";
 
 const upper = (value) => value.toLocaleUpperCase("es-AR");
+const integrantesLabel = (item) => {
+  const cantidad = Number(
+    item.cantidad_integrantes ?? item.integrantes?.length ?? 0,
+  );
+
+  return `${cantidad} ${cantidad === 1 ? "INTEGRANTE" : "INTEGRANTES"}`;
+};
 const emptyForm = () => ({
   id_familia: "",
   nombre: "",
@@ -243,7 +250,6 @@ export default function Familias() {
                 "Familia",
                 "Descripción",
                 "Integrantes",
-                "Cantidad",
                 "Estado",
                 "Acciones",
               ].map((column) => (
@@ -276,18 +282,8 @@ export default function Familias() {
                     {item.descripcion || "—"}
                   </span>
                 </div>
-                <div className="mov-gridCell">
-                  <span className="entity-wrap-text">
-                    {(item.integrantes || [])
-                      .map(
-                        (member) =>
-                          `${member.apellido}, ${member.nombre}${member.activo === false ? " (BAJA)" : ""}`,
-                      )
-                      .join(" · ") || "SIN INTEGRANTES"}
-                  </span>
-                </div>
                 <div className="mov-gridCell is-center">
-                  <span className="mov-chip">{item.cantidad_integrantes}</span>
+                  <span className="mov-chip">{integrantesLabel(item)}</span>
                 </div>
                 <div className="mov-gridCell">
                   <span

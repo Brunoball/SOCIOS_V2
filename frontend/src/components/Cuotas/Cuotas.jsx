@@ -13,7 +13,9 @@ const today = () => {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 };
-const currentYear = new Date().getFullYear();
+const currentDate = new Date();
+const currentYear = currentDate.getFullYear();
+const currentMonth = currentDate.getMonth() + 1;
 const money = (value) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(Number(value || 0));
 const percent = (value) => `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 2 }).format(Number(value || 0))}%`;
 const formatDate = (value) => value ? new Intl.DateTimeFormat("es-AR", { timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`)) : "—";
@@ -64,8 +66,8 @@ export default function Cuotas() {
   const [tab, setTab] = useState("deudores");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
-  const [year, setYear] = useState("");
-  const [month, setMonth] = useState("");
+  const [year, setYear] = useState(String(currentYear));
+  const [month, setMonth] = useState(String(currentMonth));
   const filters = useMemo(() => ({
     pestana: tab,
     buscar: search,
@@ -127,6 +129,7 @@ export default function Cuotas() {
         anio: selectedYear,
         seleccion: initialSelection,
         id_medio_pago: String(detail.medios_pago?.[0]?.id_medio_pago || ""),
+        monto_inscripcion: String(detail.monto_inscripcion ?? ""),
       });
     } catch (err) {
       setPaymentOpen(false);
@@ -326,12 +329,12 @@ export default function Cuotas() {
       rows: items.map((item) => [item.socio, item.dni, item.familia || "SIN FAMILIA", item.categoria, item.primer_periodo?.label, item.cantidad_periodos, percent(item.porcentaje_descuento), money(item.monto)]),
     }
     : {
-      headers: ["Operación", "Socios", "Concepto", "Períodos", "Categorías", "Fecha", "Base", "Descuento", "Cobrado"],
-      rows: items.map((item) => [item.codigo_operacion, item.socios_label, item.concepto, item.periodos_label, item.categorias_label, formatDate(item.fecha_pago), money(item.monto_base), item.descuento_label, money(item.monto)]),
+      headers: ["Socio", "DNI", "Períodos", "Categorías", "Fecha", "Medio de pago", "Base", "Descuento", "Cobrado"],
+      rows: items.map((item) => [item.socio, item.dni, item.periodos_label, item.categorias_label, formatDate(item.fecha_pago), item.medio_pago, money(item.monto_base), item.descuento_label, money(item.monto)]),
     };
 
   const selectedMonthLabel = (catalogos.meses || []).find((item) => String(item.id_mes) === String(month))?.nombre || "";
-  const appliedFilterLabel = [year ? `AÑO ${year}` : "TODOS LOS AÑOS", selectedMonthLabel || "TODOS LOS MESES"].join(" · ");
+  const appliedFilterLabel = [`AÑO ${year}`, selectedMonthLabel].join(" · ");
 
   const printTable = () => {
     const output = rowsForOutput();
@@ -341,11 +344,11 @@ export default function Cuotas() {
 
   const exportTable = () => {
     const output = rowsForOutput();
-    excelDownload(`cuotas_${tab}_${year || "todos"}_${month || "todos"}_${today()}`, output.headers, output.rows);
+    excelDownload(`cuotas_${tab}_${year}_${month}_${today()}`, output.headers, output.rows);
   };
 
   const debtTemplate = "minmax(180px,1.1fr) minmax(130px,.75fr) minmax(150px,.9fr) minmax(120px,.7fr) minmax(90px,.5fr) minmax(120px,.7fr) minmax(105px,.6fr) minmax(110px,.65fr) minmax(95px,.55fr)";
-  const operationTemplate = "minmax(160px,.9fr) minmax(210px,1.2fr) minmax(105px,.6fr) minmax(240px,1.35fr) minmax(160px,.9fr) minmax(105px,.6fr) minmax(110px,.65fr) minmax(95px,.55fr) minmax(115px,.65fr) minmax(100px,.6fr)";
+  const operationTemplate = "minmax(210px,1.2fr) minmax(240px,1.35fr) minmax(160px,.9fr) minmax(150px,.8fr) minmax(145px,.8fr) minmax(110px,.65fr) minmax(95px,.55fr) minmax(115px,.65fr) minmax(100px,.6fr)";
 
   return (
     <>
@@ -366,8 +369,8 @@ export default function Cuotas() {
           <div className="module-filters cuotas-main-filters">
             <label className="mov-search"><span>Buscar socio</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, DNI u operación" /></label>
             <label className="mov-filter"><span>Categoría</span><select value={category} onChange={(event) => setCategory(event.target.value)}><option value="">TODAS</option>{(catalogos.categorias || []).map((item) => <option key={item.id_categoria} value={item.id_categoria}>{item.nombre}{item.activo ? "" : " (BAJA)"}</option>)}</select></label>
-            <label className="mov-filter"><span>Año aplicado</span><select value={year} onChange={(event) => setYear(event.target.value)}><option value="">TODOS</option>{(catalogos.anios || []).map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
-            <label className="mov-filter"><span>Mes aplicado</span><select value={month} onChange={(event) => setMonth(event.target.value)}><option value="">TODOS</option>{(catalogos.meses || []).map((item) => <option key={item.id_mes} value={item.id_mes}>{item.nombre}</option>)}</select></label>
+            <label className="mov-filter"><span>Año aplicado</span><select value={year} onChange={(event) => setYear(event.target.value)}>{(catalogos.anios || []).map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <label className="mov-filter"><span>Mes aplicado</span><select value={month} onChange={(event) => setMonth(event.target.value)}>{(catalogos.meses || []).map((item) => <option key={item.id_mes} value={item.id_mes}>{item.nombre}</option>)}</select></label>
           </div>
         </div>
 
@@ -396,19 +399,18 @@ export default function Cuotas() {
           </div>
         ) : (
           <div className="mov-tableWrap global-divTable__wrap entity-table-wrap">
-            <div className="mov-gridTable mov-gridTable--head" style={{ gridTemplateColumns: operationTemplate, minWidth: 1530 }}>
-              {["Operación", "Socios", "Concepto", "Períodos", "Categorías", "Fecha", "Monto base", "Descuento", tab === "condonados" ? "Cobrado" : "Total", "Acciones"].map((column) => <div className="mov-gridCell--head" key={column}>{column}</div>)}
+            <div className="mov-gridTable mov-gridTable--head" style={{ gridTemplateColumns: operationTemplate, minWidth: 1400 }}>
+              {["Socio", "Períodos", "Categorías", "Fecha", "Medio de pago", "Monto base", "Descuento", tab === "condonados" ? "Cobrado" : "Total", "Acciones"].map((column) => <div className="mov-gridCell--head" key={column}>{column}</div>)}
             </div>
             {loading && !items.length ? <div className="module-empty"><strong>Cargando registros...</strong><span>Consultando operaciones y comprobantes.</span></div> : null}
             {!loading && !items.length ? <div className="module-empty"><strong>Sin registros para mostrar</strong><span>No hay operaciones en esta pestaña con los filtros seleccionados.</span></div> : null}
             {items.map((item) => (
-              <div className="mov-gridTable mov-gridTable--row entity-table-row" style={{ gridTemplateColumns: operationTemplate, minWidth: 1530 }} key={item.codigo_operacion}>
-                <div className="mov-gridCell entity-main-cell"><strong>{item.codigo_operacion}</strong><small>{item.cantidad_lineas} concepto(s)</small></div>
-                <div className="mov-gridCell"><span className="entity-wrap-text">{item.socios_label}</span></div>
-                <div className="mov-gridCell"><span className={`mov-chip ${tab === "condonados" ? "mov-chip--danger" : "mov-chip--ok"}`}>{item.concepto}</span></div>
+              <div className="mov-gridTable mov-gridTable--row entity-table-row" style={{ gridTemplateColumns: operationTemplate, minWidth: 1400 }} key={item.fila_id}>
+                <div className="mov-gridCell entity-main-cell"><strong>{item.socio}</strong><small>DNI {item.dni}</small></div>
                 <div className="mov-gridCell"><span className="entity-wrap-text">{item.periodos_label}</span></div>
                 <div className="mov-gridCell"><span className="entity-wrap-text">{item.categorias_label}</span></div>
-                <div className="mov-gridCell">{formatDate(item.fecha_pago)}</div>
+                <div className="mov-gridCell entity-main-cell"><strong>{formatDate(item.fecha_pago)}</strong><small>{item.codigo_operacion}</small></div>
+                <div className="mov-gridCell"><span className="entity-wrap-text">{item.medio_pago}</span></div>
                 <div className="mov-gridCell is-strong">{money(item.monto_base)}</div>
                 <div className="mov-gridCell">{item.descuento_label}</div>
                 <div className="mov-gridCell is-strong">{money(item.monto)}</div>
@@ -462,7 +464,7 @@ export default function Cuotas() {
       </CrudModal>
 
       <CrudModal open={Boolean(deleteModal)} title={deleteModal?.estado === "CONDONADO" ? "Eliminar condonación" : "Eliminar pago"} subtitle={deleteModal?.codigo_operacion || ""} onClose={() => setDeleteModal(null)} onSubmit={confirmDelete} saving={saving} submitLabel="Eliminar registro" danger>
-        <p className="entity-confirm-text">La operación se marcará como anulada para conservar la auditoría. Sus meses volverán a aparecer como deuda y podrán pagarse nuevamente.</p>
+        <p className="entity-confirm-text">La operación se marcará como anulada para conservar la auditoría. Si el cobro incluyó a más de un socio, se anulará completo; todos sus meses volverán a aparecer como deuda y podrán pagarse nuevamente.</p>
       </CrudModal>
     </>
   );

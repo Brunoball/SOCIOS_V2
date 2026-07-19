@@ -55,7 +55,7 @@ function CategoryForm({ form, setForm }) {
         </label>
         <label className="entity-field">
           <span>Vigente desde *</span>
-          <input type="date" value={form.vigente_desde} onChange={(event) => update("vigente_desde", event.target.value)} required />
+          <input type="date" value={form.vigente_desde} max={dateToday()} onChange={(event) => update("vigente_desde", event.target.value)} required />
         </label>
         <label className="entity-field">
           <span>Motivo del precio</span>

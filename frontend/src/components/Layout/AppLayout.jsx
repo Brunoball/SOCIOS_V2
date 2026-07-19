@@ -5,6 +5,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBars,
   faChartLine,
+  faGear,
   faReceipt,
   faRightFromBracket,
   faTags,
@@ -61,6 +62,7 @@ export default function AppLayout() {
   useEffect(() => setDrawerOpen(false), [location.pathname]);
 
   const activeLabel = useMemo(() => {
+    if (location.pathname.startsWith("/configuracion")) return "Configuración";
     for (const item of NAV_ITEMS) {
       const child = item.children?.find((entry) => location.pathname === entry.path);
       if (child) return child.label;
@@ -92,6 +94,15 @@ export default function AppLayout() {
         </div>
         <div className="mov-topbar__right">
           <div className="mov-topbar__section">{activeLabel}</div>
+          <button
+            className={`pp-topbarConfig ${location.pathname.startsWith("/configuracion") ? "is-active" : ""}`}
+            type="button"
+            onClick={() => navigate("/configuracion")}
+            title="Configuración"
+            aria-label="Abrir configuración"
+          >
+            <FontAwesomeIcon icon={faGear} />
+          </button>
           <button className="mov-topbar__usericon" type="button" title={`${session?.usuario?.nombre || "Usuario"} · ${session?.usuario?.rol || ""}`}><FontAwesomeIcon icon={faUserCircle} /></button>
           <button className="pp-topbarLogout" type="button" onClick={() => setLogoutOpen(true)} title="Cerrar sesión"><FontAwesomeIcon icon={faRightFromBracket} /></button>
         </div>

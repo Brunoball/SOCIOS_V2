@@ -7,11 +7,42 @@ import { saveSession } from "../Global/auth/session";
 import "./inicio.css";
 
 const APP_NAME = "Gestión de Socios";
+const REMEMBERED_ACCOUNT_KEY = "gestion_socios_recordar_cuenta";
+
+function loadRememberedAccount() {
+  try {
+    const account = JSON.parse(localStorage.getItem(REMEMBERED_ACCOUNT_KEY) || "null");
+    if (typeof account?.usuario !== "string" || typeof account?.contrasena !== "string") {
+      return null;
+    }
+    return account;
+  } catch {
+    return null;
+  }
+}
+
+function saveRememberedAccount(usuario, contrasena) {
+  try {
+    localStorage.setItem(REMEMBERED_ACCOUNT_KEY, JSON.stringify({ usuario, contrasena }));
+  } catch {
+    // El login continúa aunque el navegador bloquee el almacenamiento local.
+  }
+}
+
+function clearRememberedAccount() {
+  try {
+    localStorage.removeItem(REMEMBERED_ACCOUNT_KEY);
+  } catch {
+    // No impide iniciar o cerrar sesión.
+  }
+}
 
 export default function Inicio() {
   const navigate = useNavigate();
-  const [usuario, setUsuario] = useState("");
-  const [contrasena, setContrasena] = useState("");
+  const [rememberedAccount] = useState(loadRememberedAccount);
+  const [usuario, setUsuario] = useState(rememberedAccount?.usuario || "");
+  const [contrasena, setContrasena] = useState(rememberedAccount?.contrasena || "");
+  const [recordarCuenta, setRecordarCuenta] = useState(Boolean(rememberedAccount));
   const [visible, setVisible] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [mensaje, setMensaje] = useState("");
@@ -29,6 +60,13 @@ export default function Inicio() {
         tenant: data.tenant,
         plan: data.plan,
       });
+
+      if (recordarCuenta) {
+        saveRememberedAccount(usuario.trim(), contrasena);
+      } else {
+        clearRememberedAccount();
+      }
+
       navigate("/panel", { replace: true });
     } catch (error) {
       setMensaje(error.message || "No se pudo iniciar sesión.");
@@ -69,6 +107,21 @@ export default function Inicio() {
                 <button type="button" className="ini_toggle-password" onClick={() => setVisible((value) => !value)} aria-label="Mostrar u ocultar contraseña">
                   {visible ? "×" : "●"}
                 </button>
+              </div>
+              <div className="ini_check-row">
+                <label className="ini_recordar-wrap">
+                  <input
+                    className="ini_checkbox"
+                    type="checkbox"
+                    checked={recordarCuenta}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setRecordarCuenta(checked);
+                      if (!checked) clearRememberedAccount();
+                    }}
+                  />
+                  <span>Recordar cuenta</span>
+                </label>
               </div>
               {mensaje ? <p className="ini_mensaje-error">{mensaje}</p> : null}
               <button className="ini_boton" type="submit" disabled={cargando}>{cargando ? "Ingresando..." : "Ingresar"}</button>
