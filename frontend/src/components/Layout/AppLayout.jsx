@@ -5,15 +5,11 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBars,
   faChartLine,
-  faComments,
-  faGear,
-  faHouse,
   faReceipt,
   faRightFromBracket,
   faTags,
   faUserCircle,
   faUsers,
-  faWallet,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { clearSession, getSession } from "../Global/auth/session";
@@ -23,15 +19,12 @@ import "./AppLayout.css";
 const APP_NAME = "Gestión de Socios";
 
 const NAV_ITEMS = [
-  { key: "panel", label: "Panel", path: "/panel", icon: faHouse },
   {
     key: "socios", label: "Socios", path: "/socios", icon: faUsers,
     children: [{ key: "familias", label: "Familias", path: "/socios/familias" }],
   },
   { key: "cuotas", label: "Cuotas", path: "/cuotas", icon: faReceipt },
   { key: "categorias", label: "Categorías", path: "/categorias", icon: faTags },
-  { key: "contable", label: "Contable", path: "/contable", icon: faWallet },
-  { key: "whatsapp", label: "Bot de WhatsApp", path: "/bot-whatsapp", icon: faComments },
 ];
 
 function LogoutModal({ open, onClose, onConfirm }) {
@@ -73,7 +66,7 @@ export default function AppLayout() {
       if (child) return child.label;
       if (location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)) return item.label;
     }
-    return "Panel";
+    return "Socios";
   }, [location.pathname]);
 
   const logout = async () => {
@@ -100,7 +93,6 @@ export default function AppLayout() {
         <div className="mov-topbar__right">
           <div className="mov-topbar__section">{activeLabel}</div>
           <button className="mov-topbar__usericon" type="button" title={`${session?.usuario?.nombre || "Usuario"} · ${session?.usuario?.rol || ""}`}><FontAwesomeIcon icon={faUserCircle} /></button>
-          <button className={`pp-topbarConfig ${location.pathname === "/configuracion" ? "is-active" : ""}`} type="button" onClick={() => navigate("/configuracion")} title="Configuración"><FontAwesomeIcon icon={faGear} /></button>
           <button className="pp-topbarLogout" type="button" onClick={() => setLogoutOpen(true)} title="Cerrar sesión"><FontAwesomeIcon icon={faRightFromBracket} /></button>
         </div>
       </header>
@@ -108,16 +100,16 @@ export default function AppLayout() {
       <div className={`pp-drawerOverlay ${drawerOpen ? "is-open" : ""}`} onMouseDown={() => setDrawerOpen(false)} />
       <aside className={`pp-sidebar ${drawerOpen ? "is-drawerOpen" : ""}`}>
         <div className="pp-drawerHeader">
-          <div className="pp-drawerBrand" onClick={() => navigate("/panel")} role="button" tabIndex={0}>
+          <div className="pp-drawerBrand" onClick={() => navigate("/socios")} role="button" tabIndex={0}>
             <div className="pp-drawerBrand__mark"><FontAwesomeIcon icon={faChartLine} /></div>
-            <div className="pp-drawerBrand__txt"><div className="pp-drawerBrand__t">{APP_NAME}</div><div className="pp-drawerBrand__s">Panel principal</div></div>
+            <div className="pp-drawerBrand__txt"><div className="pp-drawerBrand__t">{APP_NAME}</div><div className="pp-drawerBrand__s">Administración</div></div>
           </div>
           <button className="pp-drawerClose" type="button" onClick={() => setDrawerOpen(false)}><FontAwesomeIcon icon={faXmark} /></button>
         </div>
 
-        <div className="pp-brand panel_contable" onClick={() => navigate("/panel")} role="button" tabIndex={0}>
+        <div className="pp-brand panel_contable" onClick={() => navigate("/socios")} role="button" tabIndex={0}>
           <div className="pp-brand__mark"><FontAwesomeIcon icon={faChartLine} /></div>
-          <div className="pp-brand__text"><div className="pp-brand__title">{APP_NAME}</div><div className="pp-brand__subtitle">Panel principal</div></div>
+          <div className="pp-brand__text"><div className="pp-brand__title">{APP_NAME}</div><div className="pp-brand__subtitle">Administración</div></div>
         </div>
 
         <nav className="pp-nav" aria-label="Navegación principal">
