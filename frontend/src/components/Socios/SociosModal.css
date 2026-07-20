@@ -1,0 +1,32 @@
+/* =========================================================
+   Socios — estilos propios de sus modales.
+   La base visual vive en Global/styles/Global_Modals.css.
+   ========================================================= */
+
+.socios-modal--form.entity-modal {
+  width: min(920px, 100%);
+}
+
+.socios-modal--state.entity-modal {
+  width: min(520px, 100%);
+}
+
+.socios-modal__categories {
+  align-items: flex-start;
+}
+
+.socios-modal__categories > label {
+  max-width: 100%;
+}
+
+.socios-modal__categories > label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .socios-modal__categories > label {
+    width: 100%;
+  }
+}

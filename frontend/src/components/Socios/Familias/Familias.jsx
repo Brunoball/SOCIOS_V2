@@ -12,15 +12,9 @@ import { canWrite } from "../../Global/auth/session";
 import { familiasApi } from "../api/familiasApi";
 import { useFamilias } from "../hooks/useFamilias";
 import "./Familias.css";
+import "./FamiliasModal.css";
 
 const upper = (value) => value.toLocaleUpperCase("es-AR");
-const integrantesLabel = (item) => {
-  const cantidad = Number(
-    item.cantidad_integrantes ?? item.integrantes?.length ?? 0,
-  );
-
-  return `${cantidad} ${cantidad === 1 ? "INTEGRANTE" : "INTEGRANTES"}`;
-};
 const emptyForm = () => ({
   id_familia: "",
   nombre: "",
@@ -46,7 +40,7 @@ function FamilyForm({ form, setForm, partners }) {
         : [...current.integrante_ids, id],
     }));
   return (
-    <div className="entity-form">
+    <div className="entity-form familias-modal__form">
       <div className="entity-form__grid entity-form__grid--single">
         <label className="entity-field">
           <span>Nombre de la familia *</span>
@@ -78,16 +72,16 @@ function FamilyForm({ form, setForm, partners }) {
           />
         </label>
       </div>
-      <fieldset className="entity-checks entity-checks--members">
+      <fieldset className="entity-checks familias-modal__members">
         <legend>Integrantes *</legend>
         <input
-          className="entity-member-search"
+          className="entity-modal-input familias-modal__member-search"
           type="search"
           value={memberSearch}
           onChange={(e) => setMemberSearch(e.target.value)}
           placeholder="Buscar socio por nombre o DNI"
         />
-        <div className="entity-checks__scroll">
+        <div className="familias-modal__member-list">
           {visible.map((partner) => {
             const belongsElsewhere =
               partner.id_familia &&
@@ -97,7 +91,7 @@ function FamilyForm({ form, setForm, partners }) {
             return (
               <label
                 key={partner.id_socio}
-                className={selected ? "is-selected" : ""}
+                className={`entity-check-option ${selected ? "is-selected" : ""}`.trim()}
                 title={
                   belongsElsewhere
                     ? `Ya pertenece a ${partner.familia}`
@@ -217,8 +211,8 @@ export default function Familias() {
     <>
       <ModulePage
         title="Familias"
-        description="Agrupación de socios para consulta y descuentos familiares."
         filters={filtersUi}
+        tabsInTitle
         primaryActionLabel="Nueva familia"
         onPrimaryAction={openNew}
         canCreate={writable}
@@ -250,6 +244,7 @@ export default function Familias() {
                 "Familia",
                 "Descripción",
                 "Integrantes",
+                "Cantidad",
                 "Estado",
                 "Acciones",
               ].map((column) => (
@@ -264,7 +259,7 @@ export default function Familias() {
                 <span>Consultando los grupos de la organización.</span>
               </div>
             ) : null}
-            {!loading && !items.length ? (
+            {!loading && !error && !items.length ? (
               <div className="module-empty">
                 <strong>Sin familias para mostrar</strong>
                 <span>Creá la primera familia o cambiá los filtros.</span>
@@ -282,8 +277,18 @@ export default function Familias() {
                     {item.descripcion || "—"}
                   </span>
                 </div>
+                <div className="mov-gridCell">
+                  <span className="entity-wrap-text">
+                    {(item.integrantes || [])
+                      .map(
+                        (member) =>
+                          `${member.apellido}, ${member.nombre}${member.activo === false ? " (BAJA)" : ""}`,
+                      )
+                      .join(" · ") || "SIN INTEGRANTES"}
+                  </span>
+                </div>
                 <div className="mov-gridCell is-center">
-                  <span className="mov-chip">{integrantesLabel(item)}</span>
+                  <span className="mov-chip">{item.cantidad_integrantes}</span>
                 </div>
                 <div className="mov-gridCell">
                   <span
@@ -332,6 +337,7 @@ export default function Familias() {
         onSubmit={save}
         saving={saving}
         submitLabel={form.id_familia ? "Guardar cambios" : "Crear familia"}
+        modalClassName="familias-modal familias-modal--form"
         wide
       >
         <FamilyForm
@@ -351,6 +357,7 @@ export default function Familias() {
         saving={saving}
         submitLabel={stateModal?.activo ? "Confirmar baja" : "Reactivar"}
         danger={Boolean(stateModal?.activo)}
+        modalClassName="familias-modal familias-modal--state"
       >
         <p className="entity-confirm-text">
           {stateModal?.activo

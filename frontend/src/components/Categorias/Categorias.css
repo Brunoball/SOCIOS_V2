@@ -1,0 +1,51 @@
+/* Medidas y alineaciones exclusivas de las tablas de Categorías. */
+.categorias-grid {
+  grid-template-columns:
+    minmax(180px, 1.1fr)
+    minmax(240px, 1.5fr)
+    minmax(140px, 0.8fr)
+    minmax(90px, 0.5fr)
+    minmax(100px, 0.6fr)
+    minmax(120px, 0.7fr)
+    minmax(120px, 0.7fr);
+  min-width: 1120px;
+}
+
+.categorias-grid > :nth-child(3) {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.categorias-grid > :nth-child(4),
+.categorias-grid > :nth-child(5),
+.categorias-grid > :nth-child(6),
+.categorias-grid > :nth-child(7) {
+  justify-content: center;
+  text-align: center;
+}
+
+.categorias-discountsGrid {
+  grid-template-columns:
+    minmax(190px, 1fr)
+    minmax(150px, 0.8fr)
+    minmax(280px, 1.5fr)
+    minmax(140px, 0.8fr)
+    minmax(110px, 0.65fr);
+  min-width: 870px;
+}
+
+.categorias-discountsGrid > :nth-child(1),
+.categorias-discountsGrid > :nth-child(2),
+.categorias-discountsGrid > :nth-child(4),
+.categorias-discountsGrid > :nth-child(5) {
+  justify-content: center;
+  text-align: center;
+}
+
+.categorias-discountNotice {
+  margin: 14px;
+}
+
+.categorias-updating {
+  margin: 10px 14px;
+}

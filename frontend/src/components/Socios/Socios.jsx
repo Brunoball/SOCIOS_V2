@@ -12,6 +12,7 @@ import { canWrite } from "../Global/auth/session";
 import { sociosApi } from "./api/sociosApi";
 import { useSocios } from "./hooks/useSocios";
 import "./Socios.css";
+import "./SociosModal.css";
 
 const dateToday = () => {
   const now = new Date();
@@ -59,7 +60,7 @@ function SocioForm({ form, setForm, catalogos }) {
         : [...current.categoria_ids, id],
     }));
   return (
-    <div className="entity-form">
+    <div className="entity-form socios-modal__form">
       <div className="entity-form__grid">
         <label className="entity-field">
           <span>Apellido *</span>
@@ -183,7 +184,7 @@ function SocioForm({ form, setForm, catalogos }) {
           />
         </label>
       </div>
-      <fieldset className="entity-checks">
+      <fieldset className="entity-checks socios-modal__categories">
         <legend>Categorías del socio</legend>
         {(catalogos.categorias || []).length ? (
           (catalogos.categorias || []).map((category) => (
@@ -344,8 +345,8 @@ export default function Socios() {
     <>
       <ModulePage
         title="Socios"
-        description="Alta, consulta y administración general de socios."
         filters={pageFilters}
+        tabsInTitle
         primaryActionLabel="Nuevo socio"
         onPrimaryAction={openNew}
         canCreate={writable}
@@ -394,7 +395,7 @@ export default function Socios() {
                 <span>Consultando el padrón de la organización.</span>
               </div>
             ) : null}
-            {!loading && !items.length ? (
+            {!loading && !error && !items.length ? (
               <div className="module-empty">
                 <strong>Sin socios para mostrar</strong>
                 <span>
@@ -484,6 +485,7 @@ export default function Socios() {
         onSubmit={save}
         saving={saving}
         submitLabel={form.id_socio ? "Guardar cambios" : "Crear socio"}
+        modalClassName="socios-modal socios-modal--form"
         wide
       >
         <SocioForm form={form} setForm={setForm} catalogos={catalogos} />
@@ -500,6 +502,7 @@ export default function Socios() {
         saving={saving}
         submitLabel={stateModal?.activo ? "Confirmar baja" : "Reactivar"}
         danger={Boolean(stateModal?.activo)}
+        modalClassName="socios-modal socios-modal--state"
       >
         {stateModal?.activo ? (
           <div className="entity-form__grid entity-form__grid--single">

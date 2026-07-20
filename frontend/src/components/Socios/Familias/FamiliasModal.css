@@ -1,0 +1,38 @@
+/* =========================================================
+   Familias — estilos propios de sus modales.
+   La base visual vive en Global/styles/Global_Modals.css.
+   ========================================================= */
+
+.familias-modal--form.entity-modal {
+  width: min(820px, 100%);
+}
+
+.familias-modal--state.entity-modal {
+  width: min(520px, 100%);
+}
+
+.familias-modal__members {
+  display: block;
+}
+
+.familias-modal__member-search {
+  margin: 2px 0 10px;
+}
+
+.familias-modal__member-list {
+  max-height: 260px;
+  display: grid;
+  gap: 7px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.familias-modal__member-list > label {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .familias-modal__member-list {
+    max-height: 220px;
+  }
+}

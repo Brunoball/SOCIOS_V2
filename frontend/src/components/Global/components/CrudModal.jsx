@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faXmark } from "@fortawesome/free-solid-svg-icons";
+import "../styles/Global_Modals.css";
 
 export default function CrudModal({
   open,
@@ -15,6 +16,7 @@ export default function CrudModal({
   danger = false,
   wide = false,
   hideSubmit = false,
+  modalClassName = "",
 }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -30,23 +32,50 @@ export default function CrudModal({
 
   if (!open) return null;
   return createPortal(
-    <div className="entity-modal-overlay" role="presentation" onMouseDown={() => !saving && onClose?.()}>
-      <div className={`entity-modal ${wide ? "entity-modal--wide" : ""}`} role="dialog" aria-modal="true" aria-labelledby="entity-modal-title" onMouseDown={(event) => event.stopPropagation()}>
+    <div
+      className="entity-modal-overlay"
+      role="presentation"
+      onMouseDown={() => !saving && onClose?.()}
+    >
+      <div
+        className={`entity-modal ${wide ? "entity-modal--wide" : ""} ${modalClassName}`.trim()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="entity-modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <header className="entity-modal__header">
           <div>
             <h2 id="entity-modal-title">{title}</h2>
             {subtitle ? <p>{subtitle}</p> : null}
           </div>
-          <button className="entity-modal__close" type="button" onClick={onClose} disabled={saving} aria-label="Cerrar">
+          <button
+            className="entity-modal__close"
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Cerrar"
+          >
             <FontAwesomeIcon icon={faXmark} />
           </button>
         </header>
         <form onSubmit={onSubmit}>
           <div className="entity-modal__body">{children}</div>
           <footer className="entity-modal__footer">
-            <button className="mov-btn mov-btn--ghost" type="button" onClick={onClose} disabled={saving}>Cancelar</button>
+            <button
+              className="mov-btn mov-btn--ghost"
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+            >
+              Cancelar
+            </button>
             {!hideSubmit ? (
-              <button className={`mov-btn ${danger ? "mov-btn--danger" : "mov-btn--primary"}`} type="submit" disabled={saving}>
+              <button
+                className={`mov-btn ${danger ? "mov-btn--danger" : "mov-btn--primary"}`}
+                type="submit"
+                disabled={saving}
+              >
                 {saving ? "Guardando..." : submitLabel}
               </button>
             ) : null}
@@ -54,6 +83,6 @@ export default function CrudModal({
         </form>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

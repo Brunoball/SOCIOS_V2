@@ -15,6 +15,36 @@ function filterOptionLabel(option) {
   return typeof option === "object" ? option.label : option;
 }
 
+function ModuleTitleTabs({ filter }) {
+  const value = filter.value ?? "";
+
+  return (
+    <div
+      className="module-titleTabs"
+      role="tablist"
+      aria-label={filter.ariaLabel || filter.label}
+    >
+      {(filter.options || []).map((option) => {
+        const optionValue = filterOptionValue(option);
+        const selected = String(value) === String(optionValue);
+
+        return (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            className={`mov-tab module-titleTab ${selected ? "is-active" : ""}`}
+            key={optionValue}
+            onClick={() => filter.onChange?.(optionValue)}
+          >
+            {filterOptionLabel(option)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ModuleFilter({ filter }) {
   const value = filter.value ?? "";
   const active = filter.type !== "search" || String(value).trim() !== "";
@@ -59,7 +89,9 @@ function ModuleFilter({ filter }) {
           onChange={(event) => filter.onChange?.(event.target.value)}
           aria-label={filter.label}
         >
-          <option value="">{filter.placeholder || "Todos"}</option>
+          {filter.includeEmptyOption !== false ? (
+            <option value="">{filter.placeholder || "Todos"}</option>
+          ) : null}
           {(filter.options || []).map((option) => (
             <option
               key={filterOptionValue(option)}
@@ -110,11 +142,20 @@ export function ModulePage({
   primaryActionLabel = "Nuevo registro",
   onPrimaryAction,
   onRefresh,
+  secondaryActions = [],
   canCreate = true,
   refreshing = false,
+  tabsInTitle = false,
   children,
   notice,
 }) {
+  const titleTabs = tabsInTitle
+    ? filters.find((filter) => filter.type === "tabs")
+    : null;
+  const headerFilters = titleTabs
+    ? filters.filter((filter) => filter !== titleTabs)
+    : filters;
+
   return (
     <section className="mov-page module-page">
       {stats.length ? (
@@ -139,16 +180,18 @@ export function ModulePage({
           <div className="mov-card__headLeft module-card__headLeft">
             <div className="title-mov module-titleBox">
               <h1 className="mov-card__title module-title">{title}</h1>
-              {description ? (
+              {titleTabs ? (
+                <ModuleTitleTabs filter={titleTabs} />
+              ) : description ? (
                 <p className="mov-card__hint module-description">
                   {description}
                 </p>
               ) : null}
             </div>
 
-            {filters.length ? (
+            {headerFilters.length ? (
               <div className="mov-headFilters module-headFilters">
-                {filters.map((filter) => (
+                {headerFilters.map((filter) => (
                   <ModuleFilter
                     filter={filter}
                     key={filter.key || filter.label}
@@ -159,6 +202,19 @@ export function ModulePage({
           </div>
 
           <div className="mov-card__actions module-card__actions">
+            {secondaryActions.map((action) => (
+              <button
+                type="button"
+                className={`mov-btn ${action.className || "mov-btn--ghost"}`}
+                onClick={action.onClick}
+                disabled={action.disabled}
+                title={action.title}
+                key={action.key || action.label}
+              >
+                {action.icon ? <FontAwesomeIcon icon={action.icon} /> : null}
+                {action.label}
+              </button>
+            ))}
             {onRefresh ? (
               <button
                 type="button"

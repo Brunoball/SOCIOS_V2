@@ -1,14 +1,23 @@
 import React from "react";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faCircleCheck, faTriangleExclamation, faXmark } from "@fortawesome/free-solid-svg-icons";
+import Toast from "../Toast";
+
+const TOAST_DURATION = {
+  success: 2800,
+  error: 4200,
+  warning: 4200,
+};
 
 export default function ModuleFeedback({ type = "success", message, onClose }) {
   if (!message) return null;
+
+  const toastType = type === "success" ? "exito" : type;
+
   return (
-    <div className={`entity-feedback entity-feedback--${type}`} role={type === "error" ? "alert" : "status"}>
-      <FontAwesomeIcon icon={type === "error" ? faTriangleExclamation : faCircleCheck} />
-      <span>{message}</span>
-      <button type="button" onClick={onClose} aria-label="Cerrar aviso"><FontAwesomeIcon icon={faXmark} /></button>
-    </div>
+    <Toast
+      tipo={toastType}
+      mensaje={message}
+      duracion={TOAST_DURATION[type] || 3200}
+      onClose={onClose}
+    />
   );
 }
