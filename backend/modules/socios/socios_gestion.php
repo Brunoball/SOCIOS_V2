@@ -105,6 +105,9 @@ trait SociosGestion
             });
         } catch (Throwable $error) {
             if (duplicate_key($error)) {
+                if (str_contains($error->getMessage(), 'uq_socio_categoria_activa')) {
+                    api_error('El socio ya tiene esa categoría asignada como activa.', 'CATEGORIA_DUPLICADA', 409);
+                }
                 api_error('El DNI o alguno de los datos ingresados ya está registrado.', 'DNI_DUPLICADO');
             }
             throw $error;
@@ -261,15 +264,15 @@ trait SociosGestion
         foreach ($current as $categoryId => $row) {
             if (!isset($selected[$categoryId])) {
                 $until = max((string)$row['fecha_desde'], $today);
-                $db->prepare('UPDATE socio_categorias SET activo = 0, fecha_hasta = ? WHERE id_socio_categoria = ?')
+                $db->prepare('UPDATE socio_categorias SET activo = 0, fecha_hasta = ?, id_categoria_activa = NULL WHERE id_socio_categoria = ?')
                     ->execute([$until, $row['id_socio_categoria']]);
             }
         }
         foreach ($categoryIds as $categoryId) {
             if (isset($current[$categoryId])) continue;
             $from = $isNew ? $admissionDate : max($admissionDate, $today);
-            $db->prepare('INSERT INTO socio_categorias (id_socio, id_categoria, fecha_desde, fecha_hasta, activo) VALUES (?, ?, ?, NULL, 1)')
-                ->execute([$partnerId, $categoryId, $from]);
+            $db->prepare('INSERT INTO socio_categorias (id_socio, id_categoria, fecha_desde, fecha_hasta, activo, id_categoria_activa) VALUES (?, ?, ?, NULL, 1, ?)')
+                ->execute([$partnerId, $categoryId, $from, $categoryId]);
         }
     }
 }
