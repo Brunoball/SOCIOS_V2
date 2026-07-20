@@ -22,6 +22,13 @@ final class Socios
         api_success(self::obtenerDatos($auth['db'], $id));
     }
 
+    public static function historial(): never
+    {
+        $auth = auth_context();
+        $id = positive_id($_GET['id'] ?? null, 'socio');
+        api_success(self::historialDatos($auth['db'], $id));
+    }
+
     public static function guardar(): never
     {
         $auth = require_admin();

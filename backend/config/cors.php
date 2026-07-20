@@ -3,8 +3,10 @@ declare(strict_types=1);
 require_once __DIR__ . '/env.php';
 
 $origin = trim((string)($_SERVER['HTTP_ORIGIN'] ?? ''));
-$allowed = array_values(array_filter(array_map('trim', explode(',', (string)env_value('ALLOWED_ORIGINS', 'http://localhost:3000')))));
-$isLocal = preg_match('#^http://(localhost|127\.0\.0\.1):\d+$#', $origin) === 1;
+$isProduction = strtolower((string)env_value('APP_ENV', 'production')) === 'production';
+$defaultOrigins = $isProduction ? '' : 'http://localhost:3000';
+$allowed = array_values(array_filter(array_map('trim', explode(',', (string)env_value('ALLOWED_ORIGINS', $defaultOrigins)))));
+$isLocal = !$isProduction && preg_match('#^http://(localhost|127\.0\.0\.1):\d+$#', $origin) === 1;
 $isAllowed = $origin !== '' && ($isLocal || in_array($origin, $allowed, true));
 
 if (!headers_sent()) {

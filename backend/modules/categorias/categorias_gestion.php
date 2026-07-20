@@ -33,6 +33,10 @@ trait CategoriasGestion
                          (id_categoria, monto_anterior, monto_nuevo, vigente_desde, vigente_hasta, motivo)
                          VALUES (?, NULL, ?, ?, NULL, ?)'
                     )->execute([$categoryId, $amount, $effectiveDate, $reason ?? 'PRECIO INICIAL']);
+                    $db->prepare(
+                        'INSERT INTO categorias_periodos_activos (id_categoria, vigente_desde, vigente_hasta)
+                         VALUES (?, ?, NULL)'
+                    )->execute([$categoryId, $effectiveDate]);
                     $after = self::detalle($db, $categoryId);
                     audit_change($db, $auth, 'CATEGORIAS', 'CREAR', 'categorias', $categoryId, "Se creó la categoría {$name}.", null, $after);
                     return $after ?? [];
@@ -96,6 +100,30 @@ trait CategoriasGestion
                 api_error($active ? 'La categoría ya se encuentra activa.' : 'La categoría ya se encuentra dada de baja.', 'ESTADO_SIN_CAMBIOS', 409);
             }
             $before = self::detalle($db, $id) ?? $locked;
+            $today = date('Y-m-d');
+            if ($active) {
+                $openPeriod = $db->prepare(
+                    'SELECT id_periodo FROM categorias_periodos_activos
+                     WHERE id_categoria = ? AND vigente_hasta IS NULL FOR UPDATE'
+                );
+                $openPeriod->execute([$id]);
+                if ($openPeriod->fetch()) api_error('El historial de la categoría ya tiene un período abierto.', 'HISTORIAL_INCONSISTENTE', 409);
+                $db->prepare(
+                    'INSERT INTO categorias_periodos_activos (id_categoria, vigente_desde, vigente_hasta)
+                     VALUES (?, ?, NULL)'
+                )->execute([$id, $today]);
+            } else {
+                $openPeriod = $db->prepare(
+                    'SELECT id_periodo, vigente_desde FROM categorias_periodos_activos
+                     WHERE id_categoria = ? AND vigente_hasta IS NULL FOR UPDATE'
+                );
+                $openPeriod->execute([$id]);
+                $period = $openPeriod->fetch();
+                if (!$period) api_error('La categoría no tiene un período activo abierto. Ejecutá la migración SQL.', 'HISTORIAL_INCONSISTENTE', 409);
+                $until = max((string)$period['vigente_desde'], $today);
+                $db->prepare('UPDATE categorias_periodos_activos SET vigente_hasta = ? WHERE id_periodo = ?')
+                    ->execute([$until, $period['id_periodo']]);
+            }
             $db->prepare('UPDATE categorias SET activo = ? WHERE id_categoria = ?')->execute([$active ? 1 : 0, $id]);
             $after = self::detalle($db, $id);
             audit_change($db, $auth, 'CATEGORIAS', $active ? 'REACTIVAR' : 'DAR_BAJA', 'categorias', $id, $active ? 'Se reactivó la categoría.' : 'Se dio de baja la categoría.', $before, $after);

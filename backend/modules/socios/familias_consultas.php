@@ -29,7 +29,7 @@ trait FamiliasConsultas
         if ($status === 'inactivo') $where[] = 'f.activo = 0';
 
         $sqlWhere = $where === [] ? '' : 'WHERE ' . implode(' AND ', $where);
-        $statement = $db->prepare("SELECT f.* FROM familias f {$sqlWhere} ORDER BY f.activo DESC, f.nombre ASC LIMIT 500");
+        $statement = $db->prepare("SELECT f.* FROM familias f {$sqlWhere} ORDER BY f.activo DESC, f.nombre ASC");
         $statement->execute($params);
         $items = self::hidratar($db, $statement->fetchAll());
 

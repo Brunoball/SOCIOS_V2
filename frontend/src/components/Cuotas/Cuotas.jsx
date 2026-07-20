@@ -228,22 +228,45 @@ export default function Cuotas() {
 
   const updateForm = (key, value) =>
     setPaymentForm((current) => ({ ...current, [key]: value }));
+
+  const changePaymentCategory = (value) =>
+    setPaymentForm((current) => ({
+      ...current,
+      id_categoria: value,
+      seleccion: {},
+    }));
+
   const changeFamilyScope = (checked) => {
     setPaymentForm((current) => {
-      if (checked || !paymentDetail)
-        return { ...current, aplicar_familia: checked };
+      if (!paymentDetail) return { ...current, aplicar_familia: checked };
+
+      const selectedMonths = new Set(
+        paymentDetail.periodos
+          .filter(
+            (period) =>
+              current.seleccion[period.clave] &&
+              String(period.id_categoria) === String(current.id_categoria) &&
+              String(period.anio) === String(current.anio),
+          )
+          .map((period) => Number(period.id_mes)),
+      );
       const selection = {};
-      Object.keys(current.seleccion).forEach((key) => {
-        const period = paymentDetail.periodos.find(
-          (item) => item.clave === key,
-        );
+      paymentDetail.periodos.forEach((period) => {
+        const isVisible =
+          String(period.id_categoria) === String(current.id_categoria) &&
+          String(period.anio) === String(current.anio) &&
+          (checked ||
+            Number(period.id_socio) ===
+              Number(paymentDetail.socio.id_socio));
         if (
-          period &&
-          Number(period.id_socio) === Number(paymentDetail.socio.id_socio)
-        )
-          selection[key] = true;
+          isVisible &&
+          period.estado === "PENDIENTE" &&
+          selectedMonths.has(Number(period.id_mes))
+        ) {
+          selection[period.clave] = true;
+        }
       });
-      return { ...current, aplicar_familia: false, seleccion: selection };
+      return { ...current, aplicar_familia: checked, seleccion: selection };
     });
   };
 
@@ -277,13 +300,15 @@ export default function Cuotas() {
     return Object.values(groups);
   }, [visiblePeriods]);
 
-  const selectedPeriods = useMemo(() => {
-    if (!paymentDetail) return [];
-    return paymentDetail.periodos.filter(
-      (period) =>
-        paymentForm.seleccion[period.clave] && period.estado === "PENDIENTE",
-    );
-  }, [paymentDetail, paymentForm.seleccion]);
+  const selectedPeriods = useMemo(
+    () =>
+      visiblePeriods.filter(
+        (period) =>
+          paymentForm.seleccion[period.clave] &&
+          period.estado === "PENDIENTE",
+      ),
+    [visiblePeriods, paymentForm.seleccion],
+  );
 
   const totals = useMemo(
     () =>
@@ -440,7 +465,10 @@ export default function Cuotas() {
     if (!deleteModal) return;
     setSaving(true);
     try {
-      const response = await cuotasApi.anular(deleteModal.codigo_operacion);
+      const response = await cuotasApi.anular(
+        deleteModal.codigo_operacion,
+        deleteModal.lineas || [],
+      );
       setDeleteModal(null);
       setFeedback({ type: "success", message: response.mensaje });
       await cargar();
@@ -1017,7 +1045,7 @@ export default function Cuotas() {
                 <select
                   value={paymentForm.id_categoria}
                   onChange={(event) =>
-                    updateForm("id_categoria", event.target.value)
+                    changePaymentCategory(event.target.value)
                   }
                   required
                 >
@@ -1368,9 +1396,9 @@ export default function Cuotas() {
         danger
       >
         <p className="entity-confirm-text">
-          La operación se marcará como anulada para conservar la auditoría. Si
-          el cobro incluyó a más de un socio, se anulará completo; todos sus
-          meses volverán a aparecer como deuda y podrán pagarse nuevamente.
+          Se anularán únicamente las {deleteModal?.cantidad_lineas || 0} líneas
+          visibles de esta fila y se conservará la auditoría. Esos períodos
+          volverán a quedar pendientes y podrán pagarse nuevamente.
         </p>
       </CrudModal>
     </>

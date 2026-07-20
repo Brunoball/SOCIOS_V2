@@ -75,7 +75,7 @@ abstract class CuotasConsultas extends CuotasSoporte
         ?int $selectedMonth
     ): array
     {
-        $where = ['s.activo = 1', 'sc.activo = 1', 'c.activo = 1'];
+        $where = [];
         $params = [];
         if ($search !== '') {
             $where[] = '(s.nombre LIKE :buscar_nombre OR s.apellido LIKE :buscar_apellido OR s.dni LIKE :buscar_dni OR c.nombre LIKE :buscar_categoria)';
@@ -92,19 +92,29 @@ abstract class CuotasConsultas extends CuotasSoporte
             $params['categoria'] = $categoryId;
         }
 
+        $sqlWhere = $where === [] ? '' : ' AND ' . implode(' AND ', $where);
         $statement = $db->prepare(
-            'SELECT s.id_socio, s.apellido, s.nombre, s.dni, s.fecha_ingreso,
-                    sc.id_categoria, sc.fecha_desde, sc.fecha_hasta,
+            "SELECT s.id_socio, s.apellido, s.nombre, s.dni,
+                    sc.id_categoria,
+                    GREATEST(sc.fecha_desde, spa.vigente_desde, cpa.vigente_desde) AS fecha_desde,
+                    LEAST(COALESCE(sc.fecha_hasta, '9999-12-31'),
+                          COALESCE(spa.vigente_hasta, '9999-12-31'),
+                          COALESCE(cpa.vigente_hasta, '9999-12-31')) AS fecha_hasta,
                     c.nombre AS categoria, c.monto_actual,
                     f.id_familia, f.nombre AS familia
              FROM socios s
              INNER JOIN socio_categorias sc ON sc.id_socio = s.id_socio
              INNER JOIN categorias c ON c.id_categoria = sc.id_categoria
+             INNER JOIN socios_periodos_activos spa ON spa.id_socio = s.id_socio
+             INNER JOIN categorias_periodos_activos cpa ON cpa.id_categoria = c.id_categoria
              LEFT JOIN familia_socios fs ON fs.id_socio = s.id_socio
              LEFT JOIN familias f ON f.id_familia = fs.id_familia AND f.activo = 1
-             WHERE ' . implode(' AND ', $where) . '
-             ORDER BY s.apellido, s.nombre, c.nombre
-             LIMIT 1000'
+             WHERE GREATEST(sc.fecha_desde, spa.vigente_desde, cpa.vigente_desde)
+                   <= LEAST(COALESCE(sc.fecha_hasta, '9999-12-31'),
+                            COALESCE(spa.vigente_hasta, '9999-12-31'),
+                            COALESCE(cpa.vigente_hasta, '9999-12-31'))
+                   {$sqlWhere}
+             ORDER BY s.apellido, s.nombre, c.nombre, fecha_desde"
         );
         $statement->execute($params);
         $assignments = $statement->fetchAll();
@@ -130,28 +140,35 @@ abstract class CuotasConsultas extends CuotasSoporte
         // consultado (o del año actual cuando no hay filtro de año).
         $listingEndYear = $selectedYear ?? (int)date('Y');
         $listingEndMonth = new DateTimeImmutable($listingEndYear . '-12-01');
-        $items = [];
-        $totalPeriods = 0;
-        $totalAmount = 0.0;
+        $itemsByPartnerCategory = [];
 
         foreach ($assignments as $assignment) {
-            $startText = max((string)$assignment['fecha_ingreso'], (string)$assignment['fecha_desde']);
-            $start = new DateTimeImmutable(substr($startText, 0, 7) . '-01');
+            $start = new DateTimeImmutable(substr((string)$assignment['fecha_desde'], 0, 7) . '-01');
             $end = $listingEndMonth;
-            if ($assignment['fecha_hasta']) {
+            if ($assignment['fecha_hasta'] && $assignment['fecha_hasta'] !== '9999-12-31') {
                 $assignmentEnd = new DateTimeImmutable(substr((string)$assignment['fecha_hasta'], 0, 7) . '-01');
                 if ($assignmentEnd < $end) $end = $assignmentEnd;
             }
             if ($start > $end) continue;
 
+            $itemKey = (int)$assignment['id_socio'] . '-' . (int)$assignment['id_categoria'];
             $familyId = $assignment['id_familia'] === null ? null : (int)$assignment['id_familia'];
             $memberCount = $familyId === null ? 0 : ($familyCounts[$familyId] ?? 0);
             $discount = self::discountForCount($rules, $memberCount);
-            $periodCount = 0;
-            $baseTotal = 0.0;
-            $amountTotal = 0.0;
-            $firstPeriod = null;
-            $lastPeriod = null;
+            if (!isset($itemsByPartnerCategory[$itemKey])) {
+                $itemsByPartnerCategory[$itemKey] = [
+                    'id_socio' => (int)$assignment['id_socio'],
+                    'socio' => trim($assignment['apellido'] . ', ' . $assignment['nombre']),
+                    'dni' => (string)$assignment['dni'],
+                    'id_categoria' => (int)$assignment['id_categoria'],
+                    'categoria' => (string)$assignment['categoria'],
+                    'id_familia' => $familyId,
+                    'familia' => $assignment['familia'],
+                    'cantidad_integrantes' => $memberCount,
+                    'porcentaje_descuento' => number_format($discount, 2, '.', ''),
+                    'periodos_pendientes' => [],
+                ];
+            }
 
             for ($period = $start; $period <= $end; $period = $period->modify('+1 month')) {
                 $year = (int)$period->format('Y');
@@ -163,32 +180,34 @@ abstract class CuotasConsultas extends CuotasSoporte
                 $base = self::priceForPeriod($prices[(int)$assignment['id_categoria']] ?? [], (float)$assignment['monto_actual'], $year, $month);
                 $amount = round($base * (1 - $discount / 100), 2);
                 $label = self::monthName($month) . ' ' . $year;
-                $firstPeriod ??= ['anio' => $year, 'mes' => $month, 'label' => $label];
-                $lastPeriod = ['anio' => $year, 'mes' => $month, 'label' => $label];
-                $periodCount++;
-                $baseTotal += $base;
-                $amountTotal += $amount;
+                $itemsByPartnerCategory[$itemKey]['periodos_pendientes'][$key] = [
+                    'anio' => $year,
+                    'mes' => $month,
+                    'label' => $label,
+                    'monto_base' => $base,
+                    'monto' => $amount,
+                ];
             }
-            if ($periodCount === 0) continue;
+        }
 
-            $totalPeriods += $periodCount;
+        $items = [];
+        $totalPeriods = 0;
+        $totalAmount = 0.0;
+        foreach ($itemsByPartnerCategory as $item) {
+            $periods = array_values($item['periodos_pendientes']);
+            usort($periods, static fn(array $a, array $b): int => [$a['anio'], $a['mes']] <=> [$b['anio'], $b['mes']]);
+            if ($periods === []) continue;
+            unset($item['periodos_pendientes']);
+            $baseTotal = array_sum(array_column($periods, 'monto_base'));
+            $amountTotal = array_sum(array_column($periods, 'monto'));
+            $item['cantidad_periodos'] = count($periods);
+            $item['primer_periodo'] = array_intersect_key($periods[0], array_flip(['anio', 'mes', 'label']));
+            $item['ultimo_periodo'] = array_intersect_key($periods[count($periods) - 1], array_flip(['anio', 'mes', 'label']));
+            $item['monto_base'] = number_format($baseTotal, 2, '.', '');
+            $item['monto'] = number_format($amountTotal, 2, '.', '');
+            $items[] = $item;
+            $totalPeriods += count($periods);
             $totalAmount += $amountTotal;
-            $items[] = [
-                'id_socio' => (int)$assignment['id_socio'],
-                'socio' => trim($assignment['apellido'] . ', ' . $assignment['nombre']),
-                'dni' => (string)$assignment['dni'],
-                'id_categoria' => (int)$assignment['id_categoria'],
-                'categoria' => (string)$assignment['categoria'],
-                'id_familia' => $familyId,
-                'familia' => $assignment['familia'],
-                'cantidad_integrantes' => $memberCount,
-                'porcentaje_descuento' => number_format($discount, 2, '.', ''),
-                'cantidad_periodos' => $periodCount,
-                'primer_periodo' => $firstPeriod,
-                'ultimo_periodo' => $lastPeriod,
-                'monto_base' => number_format($baseTotal, 2, '.', ''),
-                'monto' => number_format($amountTotal, 2, '.', ''),
-            ];
         }
 
         return [
@@ -211,18 +230,17 @@ abstract class CuotasConsultas extends CuotasSoporte
     ): array
     {
         $rows = array_merge(self::paymentRows($db, $status), self::registrationRows($db, $status));
-        $rows = array_values(array_filter($rows, static function (array $row) use ($selectedYear, $selectedMonth): bool {
+        $rows = array_values(array_filter($rows, static function (array $row) use ($categoryId, $selectedYear, $selectedMonth): bool {
+            if ($categoryId !== null && (int)$row['id_categoria'] !== $categoryId) return false;
             if ($selectedYear !== null && (int)$row['anio'] !== $selectedYear) return false;
-            if ($selectedMonth !== null) {
-                if ($row['tipo_registro'] !== 'CUOTA') return false;
+            if ($selectedMonth !== null && $row['tipo_registro'] === 'CUOTA') {
                 if ((int)$row['id_mes'] !== $selectedMonth) return false;
             }
             return true;
         }));
         $operations = self::groupOperations($rows, true);
         $needle = self::lower($search);
-        $operations = array_values(array_filter($operations, static function (array $operation) use ($needle, $categoryId): bool {
-            if ($categoryId !== null && !in_array($categoryId, $operation['categoria_ids'], true)) return false;
+        $operations = array_values(array_filter($operations, static function (array $operation) use ($needle): bool {
             if ($needle !== '' && !str_contains(self::lower($operation['busqueda']), $needle)) return false;
             return true;
         }));
@@ -230,8 +248,6 @@ abstract class CuotasConsultas extends CuotasSoporte
             $byOperation = strcmp($b['fecha_pago'] . $b['codigo_operacion'], $a['fecha_pago'] . $a['codigo_operacion']);
             return $byOperation !== 0 ? $byOperation : strcmp($a['socios_label'], $b['socios_label']);
         });
-        if (count($operations) > 1000) $operations = array_slice($operations, 0, 1000);
-
         $collected = 0.0;
         $base = 0.0;
         foreach ($operations as $operation) {
@@ -255,13 +271,16 @@ abstract class CuotasConsultas extends CuotasSoporte
         $principal = $statement->fetch();
         if (!$principal) api_error('El socio no existe.', 'SOCIO_NO_ENCONTRADO', 404);
 
-        $familyStatement = $db->prepare(
-            'SELECT f.id_familia, f.nombre
-             FROM familia_socios fs INNER JOIN familias f ON f.id_familia = fs.id_familia
-             WHERE fs.id_socio = ? AND f.activo = 1 LIMIT 1'
-        );
-        $familyStatement->execute([$partnerId]);
-        $family = $familyStatement->fetch() ?: null;
+        $family = null;
+        if ((bool)$principal['activo']) {
+            $familyStatement = $db->prepare(
+                'SELECT f.id_familia, f.nombre
+                 FROM familia_socios fs INNER JOIN familias f ON f.id_familia = fs.id_familia
+                 WHERE fs.id_socio = ? AND f.activo = 1 LIMIT 1'
+            );
+            $familyStatement->execute([$partnerId]);
+            $family = $familyStatement->fetch() ?: null;
+        }
 
         if ($family) {
             $membersStatement = $db->prepare(
@@ -279,11 +298,22 @@ abstract class CuotasConsultas extends CuotasSoporte
         $placeholders = implode(',', array_fill(0, count($memberIds), '?'));
 
         $assignmentsStatement = $db->prepare(
-            "SELECT sc.id_socio, sc.id_categoria, sc.fecha_desde, sc.fecha_hasta,
+            "SELECT sc.id_socio, sc.id_categoria,
+                    GREATEST(sc.fecha_desde, spa.vigente_desde, cpa.vigente_desde) AS fecha_desde,
+                    LEAST(COALESCE(sc.fecha_hasta, '9999-12-31'),
+                          COALESCE(spa.vigente_hasta, '9999-12-31'),
+                          COALESCE(cpa.vigente_hasta, '9999-12-31')) AS fecha_hasta,
                     c.nombre AS categoria, c.monto_actual
-             FROM socio_categorias sc INNER JOIN categorias c ON c.id_categoria = sc.id_categoria
-             WHERE sc.id_socio IN ({$placeholders}) AND sc.activo = 1 AND c.activo = 1
-             ORDER BY c.nombre"
+             FROM socio_categorias sc
+             INNER JOIN categorias c ON c.id_categoria = sc.id_categoria
+             INNER JOIN socios_periodos_activos spa ON spa.id_socio = sc.id_socio
+             INNER JOIN categorias_periodos_activos cpa ON cpa.id_categoria = sc.id_categoria
+             WHERE sc.id_socio IN ({$placeholders})
+               AND GREATEST(sc.fecha_desde, spa.vigente_desde, cpa.vigente_desde)
+                   <= LEAST(COALESCE(sc.fecha_hasta, '9999-12-31'),
+                            COALESCE(spa.vigente_hasta, '9999-12-31'),
+                            COALESCE(cpa.vigente_hasta, '9999-12-31'))
+             ORDER BY c.nombre, fecha_desde"
         );
         $assignmentsStatement->execute($memberIds);
         $assignments = $assignmentsStatement->fetchAll();
@@ -321,11 +351,10 @@ abstract class CuotasConsultas extends CuotasSoporte
 
         foreach ($assignments as $assignment) {
             $member = $memberMap[(int)$assignment['id_socio']];
-            $startText = max((string)$member['fecha_ingreso'], (string)$assignment['fecha_desde']);
-            $start = new DateTimeImmutable(substr($startText, 0, 7) . '-01');
+            $start = new DateTimeImmutable(substr((string)$assignment['fecha_desde'], 0, 7) . '-01');
             $earliestYear = min($earliestYear, (int)$start->format('Y'));
             $end = $endOfEnabledYear;
-            if ($assignment['fecha_hasta']) {
+            if ($assignment['fecha_hasta'] && $assignment['fecha_hasta'] !== '9999-12-31') {
                 $assignmentEnd = new DateTimeImmutable(substr((string)$assignment['fecha_hasta'], 0, 7) . '-01');
                 if ($assignmentEnd < $end) $end = $assignmentEnd;
             }
@@ -338,7 +367,7 @@ abstract class CuotasConsultas extends CuotasSoporte
                 $payment = $paymentMap[$key] ?? null;
                 $base = self::priceForPeriod($prices[(int)$assignment['id_categoria']] ?? [], (float)$assignment['monto_actual'], $year, $month);
                 $amount = round($base * (1 - $discount / 100), 2);
-                $periods[] = [
+                $periods[$key] = [
                     'clave' => $key,
                     'id_socio' => (int)$assignment['id_socio'],
                     'socio' => $member['socio'],
@@ -357,6 +386,7 @@ abstract class CuotasConsultas extends CuotasSoporte
             }
         }
 
+        $periods = array_values($periods);
         usort($periods, static function (array $a, array $b): int {
             return [$a['socio'], $a['categoria'], -$a['anio'], $a['id_mes']] <=> [$b['socio'], $b['categoria'], -$b['anio'], $b['id_mes']];
         });
@@ -400,26 +430,28 @@ abstract class CuotasConsultas extends CuotasSoporte
             'anio_maximo_habilitado' => $maximumEnabledYear,
             'siguiente_anio_habilitable' => $maximumEnabledYear < $currentYear + 1 ? $currentYear + 1 : null,
             'medios_pago' => self::mediosPagoCatalogo($db),
+            'monto_inscripcion' => self::registrationAmount($db),
         ];
     }
 
     protected static function aniosCatalogo(PDO $db): array
     {
         $currentYear = (int)date('Y');
-        $rows = $db->query(
-            'SELECT DISTINCT anio
-             FROM (
-                 SELECT anio FROM pagos WHERE anio IS NOT NULL
-                 UNION
-                 SELECT anio FROM pagos_inscripciones WHERE anio IS NOT NULL
-             ) AS anios_registrados
-             WHERE anio BETWEEN 2000 AND ' . ($currentYear + 1) . '
-             ORDER BY anio DESC'
-        )->fetchAll();
-        $years = array_map('intval', array_column($rows, 'anio'));
-        $years[] = $currentYear;
-        $years = array_values(array_unique($years));
-        rsort($years, SORT_NUMERIC);
+        $earliest = $db->query(
+            "SELECT MIN(anio) FROM (
+                SELECT YEAR(GREATEST(sc.fecha_desde, spa.vigente_desde, cpa.vigente_desde)) AS anio
+                FROM socio_categorias sc
+                INNER JOIN socios_periodos_activos spa ON spa.id_socio = sc.id_socio
+                INNER JOIN categorias_periodos_activos cpa ON cpa.id_categoria = sc.id_categoria
+                WHERE GREATEST(sc.fecha_desde, spa.vigente_desde, cpa.vigente_desde)
+                      <= LEAST(COALESCE(sc.fecha_hasta, '9999-12-31'), COALESCE(spa.vigente_hasta, '9999-12-31'), COALESCE(cpa.vigente_hasta, '9999-12-31'))
+                UNION ALL SELECT anio FROM pagos
+                UNION ALL SELECT anio FROM pagos_inscripciones
+             ) periodos"
+        )->fetchColumn();
+        $firstYear = max(2000, min($currentYear, (int)($earliest ?: $currentYear)));
+        $years = [];
+        for ($year = $currentYear + 1; $year >= $firstYear; $year--) $years[] = $year;
         return $years;
     }
 
@@ -465,10 +497,12 @@ abstract class CuotasConsultas extends CuotasSoporte
         $statement = $db->prepare(
             "SELECT 'CUOTA' AS tipo_registro, p.id_pago AS id_linea,
                     COALESCE(p.codigo_operacion, CONCAT('PAGO-', p.id_pago)) AS codigo_operacion,
-                    p.id_socio, CONCAT(s.apellido, ', ', s.nombre) AS socio, s.dni,
-                    p.id_categoria, c.nombre AS categoria, p.anio, p.id_mes, m.nombre AS periodo,
+                    p.id_socio, COALESCE(p.socio_nombre_snapshot, CONCAT(s.apellido, ', ', s.nombre)) AS socio,
+                    COALESCE(p.socio_dni_snapshot, s.dni) AS dni,
+                    p.id_categoria, COALESCE(p.categoria_nombre_snapshot, c.nombre) AS categoria, p.anio, p.id_mes, m.nombre AS periodo,
                     p.monto_base, p.porcentaje_descuento_familiar, p.monto, p.fecha_pago,
-                    p.estado, p.motivo_condonacion, p.observaciones, mp.nombre AS medio_pago
+                    p.estado, p.motivo_condonacion, p.observaciones,
+                    COALESCE(p.medio_pago_nombre_snapshot, mp.nombre) AS medio_pago
              FROM pagos p
              INNER JOIN socios s ON s.id_socio = p.id_socio
              INNER JOIN categorias c ON c.id_categoria = p.id_categoria
@@ -492,10 +526,12 @@ abstract class CuotasConsultas extends CuotasSoporte
         $statement = $db->prepare(
             "SELECT 'INSCRIPCION' AS tipo_registro, pi.id_pago_inscripcion AS id_linea,
                     COALESCE(pi.codigo_operacion, CONCAT('INSCRIPCION-', pi.id_pago_inscripcion)) AS codigo_operacion,
-                    pi.id_socio, CONCAT(s.apellido, ', ', s.nombre) AS socio, s.dni,
-                    pi.id_categoria, c.nombre AS categoria, pi.anio, NULL AS id_mes, pi.descripcion AS periodo,
+                    pi.id_socio, COALESCE(pi.socio_nombre_snapshot, CONCAT(s.apellido, ', ', s.nombre)) AS socio,
+                    COALESCE(pi.socio_dni_snapshot, s.dni) AS dni,
+                    pi.id_categoria, COALESCE(pi.categoria_nombre_snapshot, c.nombre) AS categoria, pi.anio, NULL AS id_mes, pi.descripcion AS periodo,
                     pi.monto_base, pi.porcentaje_descuento_familiar, pi.monto, pi.fecha_pago,
-                    pi.estado, pi.motivo_condonacion, pi.observaciones, mp.nombre AS medio_pago
+                    pi.estado, pi.motivo_condonacion, pi.observaciones,
+                    COALESCE(pi.medio_pago_nombre_snapshot, mp.nombre) AS medio_pago
              FROM pagos_inscripciones pi
              INNER JOIN socios s ON s.id_socio = pi.id_socio
              INNER JOIN categorias c ON c.id_categoria = pi.id_categoria

@@ -5,21 +5,24 @@ require_once __DIR__ . '/../config/db.php';
 
 $GLOBALS['GESTION_SOCIOS_AUTH'] = null;
 
-function request_token(): string
+function request_auth_credentials(): array
 {
     $authorization = trim((string)($_SERVER['HTTP_AUTHORIZATION'] ?? ''));
-    if (stripos($authorization, 'Bearer ') === 0) return trim(substr($authorization, 7));
+    if (stripos($authorization, 'Bearer ') === 0) {
+        return ['token' => trim(substr($authorization, 7)), 'source' => 'bearer'];
+    }
     $headerToken = trim((string)($_SERVER['HTTP_X_SESSION'] ?? $_SERVER['HTTP_X_SESSION_KEY'] ?? ''));
-    if ($headerToken !== '') return $headerToken;
+    if ($headerToken !== '') return ['token' => $headerToken, 'source' => 'header'];
     $cookieName = (string)env_value('SESSION_COOKIE_NAME', 'socios_session');
-    return trim((string)($_COOKIE[$cookieName] ?? ''));
+    return ['token' => trim((string)($_COOKIE[$cookieName] ?? '')), 'source' => 'cookie'];
 }
 
 function require_auth(): array
 {
     if (is_array($GLOBALS['GESTION_SOCIOS_AUTH'])) return $GLOBALS['GESTION_SOCIOS_AUTH'];
 
-    $token = request_token();
+    $credentials = request_auth_credentials();
+    $token = $credentials['token'];
     if ($token === '' || strlen($token) > 128) api_error('Sesión requerida.', 'SESSION_REQUIRED', 401);
 
     $master = master_db();
@@ -60,6 +63,7 @@ function require_auth(): array
     $context = [
         'id_sesion' => (int)$row['idSesion'],
         'session_key' => $token,
+        'auth_source' => $credentials['source'],
         'id_usuario_master' => (int)$row['idUsuarioMaster'],
         'id_tenant' => (int)$row['idTenant'],
         'usuario' => (string)$row['usuario'],

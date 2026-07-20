@@ -96,12 +96,13 @@ abstract class CuotasRegistros extends CuotasConsultas
         $rules = self::discountRules($db);
         $operationCode = self::operationCode($condoned ? 'COND-CUO' : 'CUO');
         $state = $condoned ? 'CONDONADO' : 'PAGADO';
+        $mediumName = self::paymentMediumName($db, $mediumId);
         $discountCache = [];
 
         try {
             $saved = transaction($db, static function () use (
             $db, $auth, $normalized, $groups, $categoryRows, $prices, $rules,
-            $operationCode, $state, $mediumId, $date, $observations, $reason, &$discountCache
+            $operationCode, $state, $mediumId, $mediumName, $date, $observations, $reason, &$discountCache
         ): array {
             $lines = [];
             $charged = 0.0;
@@ -123,6 +124,8 @@ abstract class CuotasRegistros extends CuotasConsultas
                 }
 
                 $discountContext = self::discountContextForPartner($db, $partnerId, $rules, $discountCache);
+                $partnerSnapshot = self::partnerSnapshot($db, $partnerId);
+                $categoryName = (string)$category['nombre'];
                 $base = self::priceForPeriod($prices[$categoryId] ?? [], (float)$category['monto_actual'], $year, $month);
                 $discounted = round($base * (1 - $discountContext['porcentaje'] / 100), 2);
                 $amount = $state === 'CONDONADO' ? 0.0 : $discounted;
@@ -133,12 +136,15 @@ abstract class CuotasRegistros extends CuotasConsultas
                     $update = $db->prepare(
                         'UPDATE pagos SET codigo_operacion = ?, id_familia = ?, id_medio_pago = ?, id_modalidad_pago = ?,
                          monto_base = ?, porcentaje_descuento_modalidad = 0, porcentaje_descuento_familiar = ?, monto = ?,
-                         fecha_pago = ?, estado = ?, motivo_condonacion = ?, observaciones = ? WHERE id_pago = ?'
+                         fecha_pago = ?, estado = ?, motivo_condonacion = ?, observaciones = ?,
+                         socio_nombre_snapshot = ?, socio_dni_snapshot = ?, categoria_nombre_snapshot = ?,
+                         medio_pago_nombre_snapshot = ? WHERE id_pago = ?'
                     );
                     $update->execute([
                         $operationCode, $discountContext['id_familia'], $mediumId, $modalityId,
                         number_format($base, 2, '.', ''), number_format($discountContext['porcentaje'], 2, '.', ''), number_format($amount, 2, '.', ''),
-                        $date, $state, $reason, $observations, $existing['id_pago'],
+                        $date, $state, $reason, $observations,
+                        $partnerSnapshot['socio'], $partnerSnapshot['dni'], $categoryName, $mediumName, $existing['id_pago'],
                     ]);
                     $paymentId = (int)$existing['id_pago'];
                 } else {
@@ -146,13 +152,15 @@ abstract class CuotasRegistros extends CuotasConsultas
                         'INSERT INTO pagos
                          (codigo_operacion, id_socio, id_familia, id_categoria, id_mes, id_medio_pago, id_modalidad_pago,
                           anio, monto_base, porcentaje_descuento_modalidad, porcentaje_descuento_familiar, monto,
-                          fecha_pago, estado, motivo_condonacion, observaciones)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)'
+                          fecha_pago, estado, motivo_condonacion, observaciones, socio_nombre_snapshot,
+                          socio_dni_snapshot, categoria_nombre_snapshot, medio_pago_nombre_snapshot)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                     );
                     $insert->execute([
                         $operationCode, $partnerId, $discountContext['id_familia'], $categoryId, $month, $mediumId, $modalityId,
                         $year, number_format($base, 2, '.', ''), number_format($discountContext['porcentaje'], 2, '.', ''), number_format($amount, 2, '.', ''),
                         $date, $state, $reason, $observations,
+                        $partnerSnapshot['socio'], $partnerSnapshot['dni'], $categoryName, $mediumName,
                     ]);
                     $paymentId = (int)$db->lastInsertId();
                 }
@@ -238,11 +246,15 @@ abstract class CuotasRegistros extends CuotasConsultas
         $operationCode = self::operationCode($condoned ? 'COND-INS' : 'INS');
         $state = $condoned ? 'CONDONADO' : 'PAGADO';
         $base = (float)$baseAmount;
+        $category = self::categoryMap($db, [$categoryId])[$categoryId] ?? null;
+        if (!$category) api_error('La categoría seleccionada no existe.', 'CATEGORIA_NO_ENCONTRADA', 404);
+        $categoryName = (string)$category['nombre'];
+        $mediumName = self::paymentMediumName($db, $mediumId);
 
         try {
             $saved = transaction($db, static function () use (
             $db, $auth, $recipients, $categoryId, $year, $base, $rules, &$discountCache,
-            $operationCode, $state, $mediumId, $date, $description, $observations, $reason
+            $operationCode, $state, $mediumId, $mediumName, $categoryName, $date, $description, $observations, $reason
         ): array {
             $lines = [];
             $charged = 0.0;
@@ -264,6 +276,7 @@ abstract class CuotasRegistros extends CuotasConsultas
                 if ($active !== []) api_error('Una de las inscripciones ya está pagada o condonada.', 'INSCRIPCION_YA_REGISTRADA', 409);
 
                 $discountContext = self::discountContextForPartner($db, $partnerId, $rules, $discountCache);
+                $partnerSnapshot = self::partnerSnapshot($db, $partnerId);
                 $discounted = round($base * (1 - $discountContext['porcentaje'] / 100), 2);
                 $amount = $state === 'CONDONADO' ? 0.0 : $discounted;
                 $reusable = $existingRows[0] ?? null;
@@ -271,25 +284,30 @@ abstract class CuotasRegistros extends CuotasConsultas
                     $update = $db->prepare(
                         'UPDATE pagos_inscripciones SET codigo_operacion = ?, id_familia = ?, id_medio_pago = ?, descripcion = ?, anio = ?,
                          monto_base = ?, porcentaje_descuento_familiar = ?, monto = ?, fecha_pago = ?, estado = ?,
-                         motivo_condonacion = ?, observaciones = ? WHERE id_pago_inscripcion = ?'
+                         motivo_condonacion = ?, observaciones = ?, socio_nombre_snapshot = ?, socio_dni_snapshot = ?,
+                         categoria_nombre_snapshot = ?, medio_pago_nombre_snapshot = ? WHERE id_pago_inscripcion = ?'
                     );
                     $update->execute([
                         $operationCode, $discountContext['id_familia'], $mediumId, $description, $year,
                         number_format($base, 2, '.', ''), number_format($discountContext['porcentaje'], 2, '.', ''), number_format($amount, 2, '.', ''),
-                        $date, $state, $reason, $observations, $reusable['id_pago_inscripcion'],
+                        $date, $state, $reason, $observations,
+                        $partnerSnapshot['socio'], $partnerSnapshot['dni'], $categoryName, $mediumName,
+                        $reusable['id_pago_inscripcion'],
                     ]);
                     $registrationId = (int)$reusable['id_pago_inscripcion'];
                 } else {
                     $insert = $db->prepare(
                         'INSERT INTO pagos_inscripciones
                          (codigo_operacion, id_socio, id_categoria, id_familia, id_medio_pago, descripcion, anio,
-                          monto_base, porcentaje_descuento_familiar, monto, fecha_pago, estado, motivo_condonacion, observaciones)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+                          monto_base, porcentaje_descuento_familiar, monto, fecha_pago, estado, motivo_condonacion, observaciones,
+                          socio_nombre_snapshot, socio_dni_snapshot, categoria_nombre_snapshot, medio_pago_nombre_snapshot)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
                     );
                     $insert->execute([
                         $operationCode, $partnerId, $categoryId, $discountContext['id_familia'], $mediumId, $description, $year,
                         number_format($base, 2, '.', ''), number_format($discountContext['porcentaje'], 2, '.', ''), number_format($amount, 2, '.', ''),
                         $date, $state, $reason, $observations,
+                        $partnerSnapshot['socio'], $partnerSnapshot['dni'], $categoryName, $mediumName,
                     ]);
                     $registrationId = (int)$db->lastInsertId();
                 }
@@ -329,30 +347,69 @@ abstract class CuotasRegistros extends CuotasConsultas
     {
         $db = $auth['db'];
         $code = required_text($body, 'codigo_operacion', 'código de operación', 64, false);
-        $before = self::operacionPorCodigo($db, $code);
-        if (!$before || $before['estado'] === 'ANULADO') api_error('El registro no existe o ya fue eliminado.', 'OPERACION_NO_ENCONTRADA', 404);
+        $requestedLines = is_array($body['lineas'] ?? null) ? $body['lineas'] : [];
+        if ($requestedLines === [] || count($requestedLines) > 500) {
+            api_error('Indicá entre 1 y 500 líneas visibles para anular.', 'VALIDATION_ERROR');
+        }
+        $lines = [];
+        foreach ($requestedLines as $line) {
+            if (!is_array($line)) api_error('Una línea para anular no es válida.', 'VALIDATION_ERROR');
+            $type = self::upper(clean_text($line['tipo'] ?? '', 20, false));
+            if (!in_array($type, ['CUOTA', 'INSCRIPCION'], true)) api_error('El tipo de línea no es válido.', 'VALIDATION_ERROR');
+            $id = positive_id($line['id_linea'] ?? null, 'línea');
+            $lines[$type . '-' . $id] = ['tipo' => $type, 'id_linea' => $id];
+        }
 
-        $count = transaction($db, static function () use ($db, $auth, $code, $before): int {
+        $count = transaction($db, static function () use ($db, $auth, $code, $lines): int {
+            $beforeRows = [];
+            foreach ($lines as $line) {
+                $isPayment = $line['tipo'] === 'CUOTA';
+                $table = $isPayment ? 'pagos' : 'pagos_inscripciones';
+                $idColumn = $isPayment ? 'id_pago' : 'id_pago_inscripcion';
+                $legacyPrefix = $isPayment ? 'PAGO-' : 'INSCRIPCION-';
+                $lock = $db->prepare("SELECT {$idColumn}, codigo_operacion, estado FROM {$table} WHERE {$idColumn} = ? FOR UPDATE");
+                $lock->execute([$line['id_linea']]);
+                $row = $lock->fetch();
+                $rowCode = $row ? (string)($row['codigo_operacion'] ?: $legacyPrefix . $line['id_linea']) : '';
+                if (!$row || $rowCode !== $code) {
+                    api_error('Una línea ya no pertenece a la operación mostrada. Actualizá la tabla.', 'OPERACION_DESACTUALIZADA', 409);
+                }
+                if (!in_array($row['estado'], self::ESTADOS_REGISTRADOS, true)) {
+                    api_error('Una línea seleccionada ya fue anulada.', 'OPERACION_SIN_CAMBIOS', 409);
+                }
+                $beforeRows = array_merge(
+                    $beforeRows,
+                    $isPayment
+                        ? self::paymentRows($db, null, null, $line['id_linea'])
+                        : self::registrationRows($db, null, null, $line['id_linea'])
+                );
+            }
+
             $affected = 0;
-            if (preg_match('/^PAGO-(\d+)$/', $code, $match)) {
-                $statement = $db->prepare("UPDATE pagos SET estado = 'ANULADO' WHERE id_pago = ? AND estado IN ('PAGADO','CONDONADO')");
-                $statement->execute([(int)$match[1]]);
-                $affected += $statement->rowCount();
-            } elseif (preg_match('/^INSCRIPCION-(\d+)$/', $code, $match)) {
-                $statement = $db->prepare("UPDATE pagos_inscripciones SET estado = 'ANULADO' WHERE id_pago_inscripcion = ? AND estado IN ('PAGADO','CONDONADO')");
-                $statement->execute([(int)$match[1]]);
-                $affected += $statement->rowCount();
-            } else {
-                $statement = $db->prepare("UPDATE pagos SET estado = 'ANULADO' WHERE codigo_operacion = ? AND estado IN ('PAGADO','CONDONADO')");
-                $statement->execute([$code]);
-                $affected += $statement->rowCount();
-                $statement = $db->prepare("UPDATE pagos_inscripciones SET estado = 'ANULADO' WHERE codigo_operacion = ? AND estado IN ('PAGADO','CONDONADO')");
-                $statement->execute([$code]);
+            foreach ($lines as $line) {
+                $isPayment = $line['tipo'] === 'CUOTA';
+                $table = $isPayment ? 'pagos' : 'pagos_inscripciones';
+                $idColumn = $isPayment ? 'id_pago' : 'id_pago_inscripcion';
+                $statement = $db->prepare("UPDATE {$table} SET estado = 'ANULADO' WHERE {$idColumn} = ? AND estado IN ('PAGADO','CONDONADO')");
+                $statement->execute([$line['id_linea']]);
                 $affected += $statement->rowCount();
             }
-            if ($affected === 0) api_error('El registro ya fue eliminado.', 'OPERACION_SIN_CAMBIOS', 409);
-            $auditTable = $before['tipo'] === 'INSCRIPCION' ? 'pagos_inscripciones' : 'pagos';
-            audit_change($db, $auth, 'CUOTAS', 'ANULAR', $auditTable, $code, 'Se anuló un pago o una condonación.', $before, ['estado' => 'ANULADO']);
+            if ($affected !== count($lines)) api_error('No se pudieron anular todas las líneas seleccionadas.', 'OPERACION_DESACTUALIZADA', 409);
+            $before = self::groupOperations($beforeRows)[0] ?? ['codigo_operacion' => $code, 'lineas' => $beforeRows];
+            $auditTable = count(array_unique(array_column($lines, 'tipo'))) === 1 && reset($lines)['tipo'] === 'INSCRIPCION'
+                ? 'pagos_inscripciones'
+                : 'pagos';
+            audit_change(
+                $db,
+                $auth,
+                'CUOTAS',
+                'ANULAR',
+                $auditTable,
+                $code,
+                'Se anularon únicamente las líneas seleccionadas de un pago o condonación.',
+                $before,
+                ['estado' => 'ANULADO', 'lineas' => array_values($lines)]
+            );
             return $affected;
         });
         return ['codigo_operacion' => $code, 'registros_anulados' => $count];

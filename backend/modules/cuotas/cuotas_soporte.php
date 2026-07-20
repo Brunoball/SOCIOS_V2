@@ -7,10 +7,11 @@ abstract class CuotasSoporte
 
     protected static function allowedRecipients(PDO $db, int $principalId, bool $applyFamily): array
     {
-        $statement = $db->prepare('SELECT id_socio FROM socios WHERE id_socio = ? AND activo = 1');
+        $statement = $db->prepare('SELECT id_socio, activo FROM socios WHERE id_socio = ?');
         $statement->execute([$principalId]);
-        if (!$statement->fetch()) api_error('El socio no existe o está dado de baja.', 'SOCIO_NO_DISPONIBLE', 404);
-        if (!$applyFamily) return [$principalId];
+        $principal = $statement->fetch();
+        if (!$principal) api_error('El socio no existe.', 'SOCIO_NO_DISPONIBLE', 404);
+        if (!$applyFamily || !(bool)$principal['activo']) return [$principalId];
 
         $familyStatement = $db->prepare(
             'SELECT f.id_familia FROM familia_socios fs INNER JOIN familias f ON f.id_familia = fs.id_familia
@@ -35,12 +36,21 @@ abstract class CuotasSoporte
         $end = $year . '-12-31';
         $statement = $db->prepare(
             "SELECT DISTINCT sc.id_socio
-             FROM socio_categorias sc INNER JOIN categorias c ON c.id_categoria = sc.id_categoria
+             FROM socio_categorias sc
              WHERE sc.id_socio IN ({$placeholders}) AND sc.id_categoria = ?
-               AND sc.activo = 1 AND c.activo = 1
                AND sc.fecha_desde <= ? AND (sc.fecha_hasta IS NULL OR sc.fecha_hasta >= ?)"
+             . " AND EXISTS (
+                    SELECT 1 FROM socios_periodos_activos spa
+                    WHERE spa.id_socio = sc.id_socio
+                      AND spa.vigente_desde <= ? AND (spa.vigente_hasta IS NULL OR spa.vigente_hasta >= ?)
+                 )
+                 AND EXISTS (
+                    SELECT 1 FROM categorias_periodos_activos cpa
+                    WHERE cpa.id_categoria = sc.id_categoria
+                      AND cpa.vigente_desde <= ? AND (cpa.vigente_hasta IS NULL OR cpa.vigente_hasta >= ?)
+                 )"
         );
-        $statement->execute([...$partnerIds, $categoryId, $end, $start]);
+        $statement->execute([...$partnerIds, $categoryId, $end, $start, $end, $start, $end, $start]);
         return array_map('intval', array_column($statement->fetchAll(), 'id_socio'));
     }
 
@@ -50,16 +60,23 @@ abstract class CuotasSoporte
         $end = (new DateTimeImmutable($start))->modify('last day of this month')->format('Y-m-d');
         $statement = $db->prepare(
             'SELECT sc.id_socio_categoria
-             FROM socios s
-             INNER JOIN socio_categorias sc ON sc.id_socio = s.id_socio
-             INNER JOIN categorias c ON c.id_categoria = sc.id_categoria
-             WHERE s.id_socio = ? AND c.id_categoria = ?
-               AND s.activo = 1 AND sc.activo = 1 AND c.activo = 1
-               AND s.fecha_ingreso <= ? AND sc.fecha_desde <= ?
+             FROM socio_categorias sc
+             WHERE sc.id_socio = ? AND sc.id_categoria = ?
+               AND sc.fecha_desde <= ?
                AND (sc.fecha_hasta IS NULL OR sc.fecha_hasta >= ?)
+               AND EXISTS (
+                    SELECT 1 FROM socios_periodos_activos spa
+                    WHERE spa.id_socio = sc.id_socio
+                      AND spa.vigente_desde <= ? AND (spa.vigente_hasta IS NULL OR spa.vigente_hasta >= ?)
+               )
+               AND EXISTS (
+                    SELECT 1 FROM categorias_periodos_activos cpa
+                    WHERE cpa.id_categoria = sc.id_categoria
+                      AND cpa.vigente_desde <= ? AND (cpa.vigente_hasta IS NULL OR cpa.vigente_hasta >= ?)
+               )
              LIMIT 1'
         );
-        $statement->execute([$partnerId, $categoryId, $end, $end, $start]);
+        $statement->execute([$partnerId, $categoryId, $end, $start, $end, $start, $end, $start]);
         return (bool)$statement->fetchColumn();
     }
 
@@ -165,6 +182,31 @@ abstract class CuotasSoporte
         $map = [];
         foreach ($statement->fetchAll() as $row) $map[(int)$row['id_categoria']] = $row;
         return $map;
+    }
+
+    protected static function partnerSnapshot(PDO $db, int $partnerId): array
+    {
+        $statement = $db->prepare('SELECT CONCAT(apellido, ", ", nombre) AS socio, dni FROM socios WHERE id_socio = ?');
+        $statement->execute([$partnerId]);
+        $row = $statement->fetch();
+        if (!$row) api_error('Uno de los socios seleccionados ya no existe.', 'SOCIO_NO_DISPONIBLE', 404);
+        return ['socio' => (string)$row['socio'], 'dni' => (string)$row['dni']];
+    }
+
+    protected static function paymentMediumName(PDO $db, int $mediumId): string
+    {
+        $statement = $db->prepare('SELECT nombre FROM medios_pago WHERE id_medio_pago = ?');
+        $statement->execute([$mediumId]);
+        $name = $statement->fetchColumn();
+        if ($name === false) api_error('El medio de pago seleccionado no existe.', 'MEDIO_PAGO_INVALIDO');
+        return (string)$name;
+    }
+
+    protected static function registrationAmount(PDO $db): string
+    {
+        $statement = $db->query("SELECT monto_fijo FROM modalidades_pago WHERE codigo = 'INSCRIPCION' AND activo = 1 LIMIT 1");
+        $amount = $statement->fetchColumn();
+        return number_format((float)($amount === false ? 0 : $amount), 2, '.', '');
     }
 
     protected static function priceHistory(PDO $db, array $categoryIds): array

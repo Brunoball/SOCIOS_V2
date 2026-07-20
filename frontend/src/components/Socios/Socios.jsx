@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faCircleInfo,
   faPen,
   faRotateLeft,
   faUserSlash,
@@ -59,6 +60,22 @@ function SocioForm({ form, setForm, catalogos }) {
         ? current.categoria_ids.filter((item) => item !== id)
         : [...current.categoria_ids, id],
     }));
+
+  const locations = [...(catalogos.localidades || [])];
+  if (
+    form.id_localidad &&
+    form.id_localidad !== "__new__" &&
+    !locations.some(
+      (item) => String(item.id_localidad) === String(form.id_localidad),
+    ) &&
+    form.localidad
+  ) {
+    locations.unshift({
+      id_localidad: Number(form.id_localidad),
+      nombre: `${form.localidad} (INACTIVA ACTUAL)`,
+    });
+  }
+
   return (
     <div className="entity-form socios-modal__form">
       <div className="entity-form__grid">
@@ -84,11 +101,11 @@ function SocioForm({ form, setForm, catalogos }) {
           <span>DNI *</span>
           <input
             value={form.dni}
-            onChange={(e) =>
-              update("dni", e.target.value.replace(/[^0-9A-Za-z.-]/g, ""))
-            }
+            onChange={(e) => update("dni", e.target.value.replace(/\D/g, ""))}
             required
-            maxLength={20}
+            minLength={6}
+            maxLength={9}
+            pattern="[0-9]{6,9}"
             inputMode="numeric"
           />
         </label>
@@ -138,7 +155,7 @@ function SocioForm({ form, setForm, catalogos }) {
             onChange={(e) => update("id_localidad", e.target.value)}
             required
           >
-            {(catalogos.localidades || []).map((item) => (
+            {locations.map((item) => (
               <option key={item.id_localidad} value={item.id_localidad}>
                 {item.nombre}
               </option>
@@ -199,9 +216,16 @@ function SocioForm({ form, setForm, catalogos }) {
               <input
                 type="checkbox"
                 checked={form.categoria_ids.includes(category.id_categoria)}
+                disabled={
+                  !category.activo &&
+                  !form.categoria_ids.includes(category.id_categoria)
+                }
                 onChange={() => toggleCategory(category.id_categoria)}
               />
-              <span>{category.nombre}</span>
+              <span>
+                {category.nombre}
+                {category.activo ? "" : " (BAJA)"}
+              </span>
             </label>
           ))
         ) : (
@@ -235,6 +259,8 @@ export default function Socios() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [stateModal, setStateModal] = useState(null);
+  const [historyModal, setHistoryModal] = useState(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [stateForm, setStateForm] = useState({
     fecha_baja: dateToday(),
     motivo_baja: "",
@@ -243,6 +269,18 @@ export default function Socios() {
   const openNew = () => {
     setForm(emptyForm(catalogos));
     setModalOpen(true);
+  };
+  const openHistory = async (item) => {
+    setHistoryModal({ socio: item, data: null, error: null });
+    setHistoryLoading(true);
+    try {
+      const response = await sociosApi.historial(item.id_socio);
+      setHistoryModal({ socio: item, data: response, error: null });
+    } catch (err) {
+      setHistoryModal({ socio: item, data: null, error: err.message });
+    } finally {
+      setHistoryLoading(false);
+    }
   };
   const openEdit = (item) => {
     setForm({
@@ -324,7 +362,7 @@ export default function Socios() {
       onChange: setCategory,
       options: (catalogos.categorias || []).map((item) => ({
         value: item.id_categoria,
-        label: item.nombre,
+        label: `${item.nombre}${item.activo ? "" : " (BAJA)"}`,
       })),
     },
     {
@@ -440,36 +478,44 @@ export default function Socios() {
                   </span>
                 </div>
                 <div className="mov-gridCell mov-gridCell--actions">
-                  {writable ? (
-                    <div className="mov-actionsInline">
-                      <button
-                        className="mov-iconBtn"
-                        type="button"
-                        title="Editar"
-                        onClick={() => openEdit(item)}
-                      >
-                        <FontAwesomeIcon icon={faPen} />
-                      </button>
-                      <button
-                        className={`mov-iconBtn ${item.activo ? "mov-iconBtn--danger" : ""}`}
-                        type="button"
-                        title={item.activo ? "Dar de baja" : "Reactivar"}
-                        onClick={() => {
-                          setStateForm({
-                            fecha_baja: dateToday(),
-                            motivo_baja: "",
-                          });
-                          setStateModal(item);
-                        }}
-                      >
-                        <FontAwesomeIcon
-                          icon={item.activo ? faUserSlash : faRotateLeft}
-                        />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="entity-readonly">CONSULTA</span>
-                  )}
+                  <div className="mov-actionsInline">
+                    <button
+                      className="mov-iconBtn"
+                      type="button"
+                      title="Ver ficha e historial"
+                      onClick={() => openHistory(item)}
+                    >
+                      <FontAwesomeIcon icon={faCircleInfo} />
+                    </button>
+                    {writable ? (
+                      <>
+                        <button
+                          className="mov-iconBtn"
+                          type="button"
+                          title="Editar"
+                          onClick={() => openEdit(item)}
+                        >
+                          <FontAwesomeIcon icon={faPen} />
+                        </button>
+                        <button
+                          className={`mov-iconBtn ${item.activo ? "mov-iconBtn--danger" : ""}`}
+                          type="button"
+                          title={item.activo ? "Dar de baja" : "Reactivar"}
+                          onClick={() => {
+                            setStateForm({
+                              fecha_baja: dateToday(),
+                              motivo_baja: "",
+                            });
+                            setStateModal(item);
+                          }}
+                        >
+                          <FontAwesomeIcon
+                            icon={item.activo ? faUserSlash : faRotateLeft}
+                          />
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             ))}
@@ -489,6 +535,80 @@ export default function Socios() {
         wide
       >
         <SocioForm form={form} setForm={setForm} catalogos={catalogos} />
+      </CrudModal>
+
+      <CrudModal
+        open={Boolean(historyModal)}
+        title="Ficha e historial del socio"
+        subtitle={historyModal?.socio ? `${historyModal.socio.apellido}, ${historyModal.socio.nombre}` : ""}
+        onClose={() => setHistoryModal(null)}
+        hideSubmit
+        wide
+        modalClassName="socios-modal socios-modal--history"
+      >
+        {historyLoading ? (
+          <div className="module-empty"><strong>Cargando historial...</strong></div>
+        ) : historyModal?.error ? (
+          <ModuleFeedback type="error" message={historyModal.error} />
+        ) : historyModal?.data ? (
+          <div className="socio-history">
+            <section className="socio-history__summary">
+              <div><span>Estado</span><strong>{historyModal.data.socio.activo ? "ACTIVO" : "BAJA"}</strong></div>
+              <div><span>Cuenta</span><strong>{historyModal.data.resumen.estado_cuenta === "AL_DIA" ? "AL DÍA" : "CON DEUDA"}</strong></div>
+              <div><span>Cuotas pagadas</span><strong>{historyModal.data.resumen.cuotas_pagadas}</strong></div>
+              <div><span>Cuotas pendientes</span><strong>{historyModal.data.resumen.cuotas_pendientes}</strong></div>
+            </section>
+
+            <section className="socio-history__section">
+              <h3>Períodos de actividad</h3>
+              {historyModal.data.periodos.length ? historyModal.data.periodos.map((periodo) => (
+                <div className="socio-history__row" key={periodo.id_periodo}>
+                  <strong>{formatDate(periodo.vigente_desde)} → {periodo.vigente_hasta ? formatDate(periodo.vigente_hasta) : "ACTUALIDAD"}</strong>
+                  <span>{periodo.vigente_hasta ? (periodo.motivo_baja || "PERÍODO CERRADO") : "PERÍODO ACTIVO"}</span>
+                </div>
+              )) : <p>Sin períodos registrados.</p>}
+            </section>
+
+            <section className="socio-history__section">
+              <h3>Historial de categorías</h3>
+              {historyModal.data.categorias.length ? historyModal.data.categorias.map((categoria) => (
+                <div className="socio-history__row" key={categoria.id_socio_categoria}>
+                  <strong>{categoria.categoria}</strong>
+                  <span>{formatDate(categoria.fecha_desde)} → {categoria.fecha_hasta ? formatDate(categoria.fecha_hasta) : "ACTUALIDAD"}</span>
+                </div>
+              )) : <p>Sin categorías registradas.</p>}
+            </section>
+
+            <section className="socio-history__section">
+              <h3>Cuotas pendientes</h3>
+              {historyModal.data.pendientes.length ? (
+                <div className="socio-history__chips">
+                  {historyModal.data.pendientes.map((item) => <span key={`${item.id_categoria}-${item.anio}-${item.id_mes}`}>{item.categoria} · {item.mes} {item.anio}</span>)}
+                </div>
+              ) : <p className="socio-history__ok">El socio está al día.</p>}
+            </section>
+
+            <section className="socio-history__section">
+              <h3>Pagos y condonaciones</h3>
+              {historyModal.data.pagos.length ? historyModal.data.pagos.map((pago) => (
+                <div className="socio-history__row" key={pago.id_pago}>
+                  <strong>{pago.categoria} · {pago.mes} {pago.anio}</strong>
+                  <span>{pago.estado} · ${Number(pago.monto).toLocaleString("es-AR", { minimumFractionDigits: 2 })} · {formatDate(pago.fecha_pago)}</span>
+                </div>
+              )) : <p>Sin cuotas registradas.</p>}
+            </section>
+
+            <section className="socio-history__section">
+              <h3>Inscripciones</h3>
+              {historyModal.data.inscripciones.length ? historyModal.data.inscripciones.map((item) => (
+                <div className="socio-history__row" key={item.id_pago_inscripcion}>
+                  <strong>{item.categoria} · {item.anio}</strong>
+                  <span>{item.estado} · ${Number(item.monto).toLocaleString("es-AR", { minimumFractionDigits: 2 })} · {formatDate(item.fecha_pago)}</span>
+                </div>
+              )) : <p>Sin inscripciones registradas.</p>}
+            </section>
+          </div>
+        ) : null}
       </CrudModal>
 
       <CrudModal

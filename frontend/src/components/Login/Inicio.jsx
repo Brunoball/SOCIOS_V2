@@ -12,18 +12,20 @@ const REMEMBERED_ACCOUNT_KEY = "gestion_socios_recordar_cuenta";
 function loadRememberedAccount() {
   try {
     const account = JSON.parse(localStorage.getItem(REMEMBERED_ACCOUNT_KEY) || "null");
-    if (typeof account?.usuario !== "string" || typeof account?.contrasena !== "string") {
+    if (typeof account?.usuario !== "string") {
       return null;
     }
-    return account;
+    const sanitized = { usuario: account.usuario };
+    localStorage.setItem(REMEMBERED_ACCOUNT_KEY, JSON.stringify(sanitized));
+    return sanitized;
   } catch {
     return null;
   }
 }
 
-function saveRememberedAccount(usuario, contrasena) {
+function saveRememberedAccount(usuario) {
   try {
-    localStorage.setItem(REMEMBERED_ACCOUNT_KEY, JSON.stringify({ usuario, contrasena }));
+    localStorage.setItem(REMEMBERED_ACCOUNT_KEY, JSON.stringify({ usuario }));
   } catch {
     // El login continúa aunque el navegador bloquee el almacenamiento local.
   }
@@ -41,7 +43,7 @@ export default function Inicio() {
   const navigate = useNavigate();
   const [rememberedAccount] = useState(loadRememberedAccount);
   const [usuario, setUsuario] = useState(rememberedAccount?.usuario || "");
-  const [contrasena, setContrasena] = useState(rememberedAccount?.contrasena || "");
+  const [contrasena, setContrasena] = useState("");
   const [recordarCuenta, setRecordarCuenta] = useState(Boolean(rememberedAccount));
   const [visible, setVisible] = useState(false);
   const [cargando, setCargando] = useState(false);
@@ -62,7 +64,7 @@ export default function Inicio() {
       });
 
       if (recordarCuenta) {
-        saveRememberedAccount(usuario.trim(), contrasena);
+        saveRememberedAccount(usuario.trim());
       } else {
         clearRememberedAccount();
       }

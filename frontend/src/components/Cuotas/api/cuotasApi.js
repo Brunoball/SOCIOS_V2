@@ -6,6 +6,9 @@ export const cuotasApi = {
   detalleSocio: (id, hastaAnio = "") => apiGet("cuotas_detalle_socio", { id, hasta_anio: hastaAnio }),
   registrarPago: (payload) => apiPost("cuotas_registrar_pago", payload),
   registrarInscripcion: (payload) => apiPost("cuotas_registrar_inscripcion", payload),
-  anular: (codigoOperacion) => apiPost("cuotas_anular", { codigo_operacion: codigoOperacion }),
+  anular: (codigoOperacion, lineas) => apiPost("cuotas_anular", {
+    codigo_operacion: codigoOperacion,
+    lineas: lineas.map(({ tipo, id_linea }) => ({ tipo, id_linea })),
+  }),
   comprobante: (codigoOperacion) => apiGet("cuotas_comprobante", { codigo: codigoOperacion }),
 };

@@ -12,7 +12,9 @@ trait SociosGestion
         $name = required_text($body, 'nombre', 'nombre', 120);
         $surname = required_text($body, 'apellido', 'apellido', 120);
         $dni = preg_replace('/[.\s-]+/', '', required_text($body, 'dni', 'DNI', 20)) ?? '';
-        if ($dni === '') api_error('El DNI es obligatorio.', 'VALIDATION_ERROR');
+        if (!preg_match('/^\d{6,9}$/', $dni)) {
+            api_error('El DNI debe contener entre 6 y 9 dígitos.', 'VALIDATION_ERROR');
+        }
 
         $birthDate = valid_date($body['fecha_nacimiento'] ?? '', 'nacimiento', false);
         if ($birthDate !== null && $birthDate > date('Y-m-d')) {
@@ -37,11 +39,11 @@ trait SociosGestion
             }
         }
         $observations = optional_text($body['observaciones'] ?? null, 5000);
-        $categoryIds = self::validarCategorias($db, $body['categoria_ids'] ?? []);
+        $categoryIds = self::validarCategorias($db, $body['categoria_ids'] ?? [], $id);
 
         try {
             $saved = transaction($db, static function () use ($db, $auth, $body, $id, $name, $surname, $dni, $birthDate, $sex, $address, $phone, $email, $admissionDate, $observations, $categoryIds): array {
-                $locationId = self::resolverLocalidad($db, $auth, $body);
+                $locationId = self::resolverLocalidad($db, $auth, $body, $id);
                 $duplicate = $db->prepare('SELECT id_socio FROM socios WHERE dni = ? AND id_socio <> ? LIMIT 1');
                 $duplicate->execute([$dni, $id ?? 0]);
                 if ($duplicate->fetch()) api_error('Ya existe un socio con ese DNI.', 'DNI_DUPLICADO');
@@ -54,6 +56,10 @@ trait SociosGestion
                     );
                     $insert->execute([$name, $surname, $dni, $birthDate, $sex, $address, $locationId, $phone, $email, $admissionDate, $observations]);
                     $partnerId = (int)$db->lastInsertId();
+                    $db->prepare(
+                        'INSERT INTO socios_periodos_activos (id_socio, vigente_desde, vigente_hasta, motivo_baja)
+                         VALUES (?, ?, NULL, NULL)'
+                    )->execute([$partnerId, $admissionDate]);
                     self::sincronizarCategorias($db, $partnerId, $categoryIds, $admissionDate, true);
                     $after = self::detalle($db, $partnerId);
                     audit_change($db, $auth, 'SOCIOS', 'CREAR', 'socios', $partnerId, "Se creó el socio {$surname}, {$name}.", null, $after);
@@ -82,6 +88,16 @@ trait SociosGestion
                         id_localidad = ?, telefono = ?, email = ?, fecha_ingreso = ?, observaciones = ? WHERE id_socio = ?'
                 );
                 $update->execute([$name, $surname, $dni, $birthDate, $sex, $address, $locationId, $phone, $email, $admissionDate, $observations, $id]);
+                if ($locked['fecha_ingreso'] !== $admissionDate) {
+                    $db->prepare(
+                        'UPDATE socios_periodos_activos SET vigente_desde = ?
+                         WHERE id_socio = ? AND vigente_desde = ?'
+                    )->execute([$admissionDate, $id, $locked['fecha_ingreso']]);
+                    $db->prepare(
+                        'UPDATE socio_categorias SET fecha_desde = ?
+                         WHERE id_socio = ? AND fecha_desde = ?'
+                    )->execute([$admissionDate, $id, $locked['fecha_ingreso']]);
+                }
                 self::sincronizarCategorias($db, $id, $categoryIds, $admissionDate, false);
                 $after = self::detalle($db, $id);
                 audit_change($db, $auth, 'SOCIOS', 'MODIFICAR', 'socios', $id, "Se modificó el socio {$surname}, {$name}.", $before, $after);
@@ -113,6 +129,19 @@ trait SociosGestion
                 api_error('La fecha de baja no puede ser anterior a la fecha de ingreso.', 'FECHA_BAJA_INVALIDA');
             }
             $before = self::detalle($db, $id) ?? $locked;
+            $period = $db->prepare(
+                'SELECT id_periodo, vigente_desde FROM socios_periodos_activos
+                 WHERE id_socio = ? AND vigente_hasta IS NULL FOR UPDATE'
+            );
+            $period->execute([$id]);
+            $activePeriod = $period->fetch();
+            if (!$activePeriod) api_error('El socio no tiene un período activo abierto. Ejecutá la migración SQL.', 'HISTORIAL_INCONSISTENTE', 409);
+            if ($date < $activePeriod['vigente_desde']) {
+                api_error('La fecha de baja no puede ser anterior a la última reactivación.', 'FECHA_BAJA_INVALIDA');
+            }
+            $db->prepare(
+                'UPDATE socios_periodos_activos SET vigente_hasta = ?, motivo_baja = ? WHERE id_periodo = ?'
+            )->execute([$date, $reason, $activePeriod['id_periodo']]);
             $db->prepare('UPDATE socios SET activo = 0, fecha_baja = ?, motivo_baja = ? WHERE id_socio = ?')->execute([$date, $reason, $id]);
             $after = self::detalle($db, $id);
             audit_change($db, $auth, 'SOCIOS', 'DAR_BAJA', 'socios', $id, 'Se dio de baja al socio.', $before, $after);
@@ -131,6 +160,16 @@ trait SociosGestion
             if (!$locked) api_error('El socio no existe.', 'SOCIO_NO_ENCONTRADO', 404);
             if ((bool)$locked['activo']) api_error('El socio ya se encuentra activo.', 'ESTADO_SIN_CAMBIOS', 409);
             $before = self::detalle($db, $id) ?? $locked;
+            $today = date('Y-m-d');
+            $openPeriod = $db->prepare(
+                'SELECT id_periodo FROM socios_periodos_activos WHERE id_socio = ? AND vigente_hasta IS NULL FOR UPDATE'
+            );
+            $openPeriod->execute([$id]);
+            if ($openPeriod->fetch()) api_error('El historial del socio ya tiene un período abierto.', 'HISTORIAL_INCONSISTENTE', 409);
+            $db->prepare(
+                'INSERT INTO socios_periodos_activos (id_socio, vigente_desde, vigente_hasta, motivo_baja)
+                 VALUES (?, ?, NULL, NULL)'
+            )->execute([$id, $today]);
             $db->prepare('UPDATE socios SET activo = 1, fecha_baja = NULL, motivo_baja = NULL WHERE id_socio = ?')->execute([$id]);
             $after = self::detalle($db, $id);
             audit_change($db, $auth, 'SOCIOS', 'REACTIVAR', 'socios', $id, 'Se reactivó al socio.', $before, $after);
@@ -139,7 +178,7 @@ trait SociosGestion
         return ['item' => $saved];
     }
 
-    private static function resolverLocalidad(PDO $db, array $auth, array $body): int
+    private static function resolverLocalidad(PDO $db, array $auth, array $body, ?int $partnerId): int
     {
         if (!empty($body['localidad_nueva'])) {
             $name = clean_text($body['localidad_nueva'], 120);
@@ -166,21 +205,37 @@ trait SociosGestion
         }
 
         $id = positive_id($body['id_localidad'] ?? null, 'localidad');
-        $statement = $db->prepare('SELECT id_localidad FROM localidades WHERE id_localidad = ? AND activo = 1');
-        $statement->execute([$id]);
+        $statement = $db->prepare(
+            'SELECT l.id_localidad
+             FROM localidades l
+             LEFT JOIN socios s ON s.id_socio = ? AND s.id_localidad = l.id_localidad
+             WHERE l.id_localidad = ? AND (l.activo = 1 OR s.id_socio IS NOT NULL)'
+        );
+        $statement->execute([$partnerId ?? 0, $id]);
         if (!$statement->fetch()) {
             api_error('La localidad seleccionada no existe o está inactiva.', 'LOCALIDAD_INVALIDA');
         }
         return $id;
     }
 
-    private static function validarCategorias(PDO $db, mixed $value): array
+    private static function validarCategorias(PDO $db, mixed $value, ?int $partnerId): array
     {
         $ids = id_list($value);
         if ($ids === []) return [];
         $placeholders = implode(',', array_fill(0, count($ids), '?'));
-        $statement = $db->prepare("SELECT id_categoria FROM categorias WHERE activo = 1 AND id_categoria IN ({$placeholders})");
-        $statement->execute($ids);
+        $statement = $db->prepare(
+            "SELECT c.id_categoria
+             FROM categorias c
+             WHERE c.id_categoria IN ({$placeholders})
+               AND (
+                    c.activo = 1
+                    OR EXISTS (
+                        SELECT 1 FROM socio_categorias sc
+                        WHERE sc.id_socio = ? AND sc.id_categoria = c.id_categoria AND sc.activo = 1
+                    )
+               )"
+        );
+        $statement->execute([...$ids, $partnerId ?? 0]);
         $valid = array_map('intval', $statement->fetchAll(PDO::FETCH_COLUMN));
         sort($valid);
         $expected = $ids;
@@ -193,7 +248,10 @@ trait SociosGestion
 
     private static function sincronizarCategorias(PDO $db, int $partnerId, array $categoryIds, string $admissionDate, bool $isNew): void
     {
-        $currentStatement = $db->prepare('SELECT id_socio_categoria, id_categoria, activo, fecha_desde FROM socio_categorias WHERE id_socio = ? FOR UPDATE');
+        $currentStatement = $db->prepare(
+            'SELECT id_socio_categoria, id_categoria, activo, fecha_desde
+             FROM socio_categorias WHERE id_socio = ? AND activo = 1 FOR UPDATE'
+        );
         $currentStatement->execute([$partnerId]);
         $current = [];
         foreach ($currentStatement->fetchAll() as $row) $current[(int)$row['id_categoria']] = $row;
@@ -201,22 +259,17 @@ trait SociosGestion
         $today = date('Y-m-d');
 
         foreach ($current as $categoryId => $row) {
-            if ((bool)$row['activo'] && !isset($selected[$categoryId])) {
+            if (!isset($selected[$categoryId])) {
                 $until = max((string)$row['fecha_desde'], $today);
                 $db->prepare('UPDATE socio_categorias SET activo = 0, fecha_hasta = ? WHERE id_socio_categoria = ?')
                     ->execute([$until, $row['id_socio_categoria']]);
             }
         }
         foreach ($categoryIds as $categoryId) {
-            if (!isset($current[$categoryId])) {
-                $from = $isNew ? $admissionDate : max($admissionDate, $today);
-                $db->prepare('INSERT INTO socio_categorias (id_socio, id_categoria, fecha_desde, fecha_hasta, activo) VALUES (?, ?, ?, NULL, 1)')
-                    ->execute([$partnerId, $categoryId, $from]);
-            } elseif (!(bool)$current[$categoryId]['activo']) {
-                $from = max($admissionDate, $today);
-                $db->prepare('UPDATE socio_categorias SET activo = 1, fecha_desde = ?, fecha_hasta = NULL WHERE id_socio_categoria = ?')
-                    ->execute([$from, $current[$categoryId]['id_socio_categoria']]);
-            }
+            if (isset($current[$categoryId])) continue;
+            $from = $isNew ? $admissionDate : max($admissionDate, $today);
+            $db->prepare('INSERT INTO socio_categorias (id_socio, id_categoria, fecha_desde, fecha_hasta, activo) VALUES (?, ?, ?, NULL, 1)')
+                ->execute([$partnerId, $categoryId, $from]);
         }
     }
 }

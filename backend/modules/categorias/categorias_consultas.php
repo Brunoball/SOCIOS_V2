@@ -32,8 +32,7 @@ trait CategoriasConsultas
              LEFT JOIN socios s ON s.id_socio = sc.id_socio
              {$sqlWhere}
              GROUP BY c.id_categoria
-             ORDER BY c.activo DESC, c.nombre ASC
-             LIMIT 500"
+             ORDER BY c.activo DESC, c.nombre ASC"
         );
         $statement->execute($params);
         $items = $statement->fetchAll();

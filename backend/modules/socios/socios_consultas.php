@@ -57,7 +57,7 @@ trait SociosConsultas
         }
 
         $sqlWhere = $where === [] ? '' : 'WHERE ' . implode(' AND ', $where);
-        $statement = $db->prepare(self::baseQuery($sqlWhere) . ' ORDER BY s.activo DESC, s.apellido ASC, s.nombre ASC LIMIT 500');
+        $statement = $db->prepare(self::baseQuery($sqlWhere) . ' ORDER BY s.activo DESC, s.apellido ASC, s.nombre ASC');
         $statement->execute($params);
         $items = [];
         foreach ($statement->fetchAll() as $row) $items[] = self::cast($row);
@@ -99,13 +99,16 @@ trait SociosConsultas
             'SELECT id_localidad, nombre, codigo_postal FROM localidades WHERE activo = 1 ORDER BY nombre'
         )->fetchAll();
         $categories = $db->query(
-            'SELECT id_categoria, nombre, monto_actual FROM categorias WHERE activo = 1 ORDER BY nombre'
+            'SELECT id_categoria, nombre, monto_actual, activo FROM categorias ORDER BY activo DESC, nombre'
         )->fetchAll();
         $families = $db->query(
             'SELECT id_familia, nombre FROM familias WHERE activo = 1 ORDER BY nombre'
         )->fetchAll();
         foreach ($locations as &$row) $row['id_localidad'] = (int)$row['id_localidad'];
-        foreach ($categories as &$row) $row['id_categoria'] = (int)$row['id_categoria'];
+        foreach ($categories as &$row) {
+            $row['id_categoria'] = (int)$row['id_categoria'];
+            $row['activo'] = (bool)$row['activo'];
+        }
         foreach ($families as &$row) $row['id_familia'] = (int)$row['id_familia'];
         unset($row);
         return ['localidades' => $locations, 'categorias' => $categories, 'familias' => $families];
@@ -150,4 +153,142 @@ trait SociosConsultas
         $row = $statement->fetch();
         return $row ? self::cast($row) : null;
     }
+
+    private static function historialDatos(PDO $db, int $id): array
+    {
+        $socio = self::detalle($db, $id);
+        if (!$socio) api_error('El socio no existe.', 'SOCIO_NO_ENCONTRADO', 404);
+
+        $stmt = $db->prepare(
+            'SELECT id_periodo, vigente_desde, vigente_hasta, motivo_baja, created_at
+             FROM socios_periodos_activos
+             WHERE id_socio = ?
+             ORDER BY vigente_desde DESC, id_periodo DESC'
+        );
+        $stmt->execute([$id]);
+        $periodos = $stmt->fetchAll();
+        foreach ($periodos as &$periodo) $periodo['id_periodo'] = (int)$periodo['id_periodo'];
+        unset($periodo);
+
+        $stmt = $db->prepare(
+            'SELECT sc.id_socio_categoria, sc.id_categoria, c.nombre AS categoria,
+                    sc.fecha_desde, sc.fecha_hasta, sc.activo
+             FROM socio_categorias sc
+             INNER JOIN categorias c ON c.id_categoria = sc.id_categoria
+             WHERE sc.id_socio = ?
+             ORDER BY sc.fecha_desde DESC, sc.id_socio_categoria DESC'
+        );
+        $stmt->execute([$id]);
+        $asignaciones = $stmt->fetchAll();
+        foreach ($asignaciones as &$asignacion) {
+            $asignacion['id_socio_categoria'] = (int)$asignacion['id_socio_categoria'];
+            $asignacion['id_categoria'] = (int)$asignacion['id_categoria'];
+            $asignacion['activo'] = (bool)$asignacion['activo'];
+        }
+        unset($asignacion);
+
+        $stmt = $db->prepare(
+            "SELECT p.id_pago, p.id_categoria, COALESCE(p.categoria_nombre_snapshot, c.nombre) AS categoria,
+                    p.anio, p.id_mes, m.nombre AS mes, p.monto, p.fecha_pago, p.estado,
+                    COALESCE(p.medio_pago_nombre_snapshot, mp.nombre) AS medio_pago
+             FROM pagos p
+             INNER JOIN meses m ON m.id_mes = p.id_mes
+             INNER JOIN categorias c ON c.id_categoria = p.id_categoria
+             INNER JOIN medios_pago mp ON mp.id_medio_pago = p.id_medio_pago
+             WHERE p.id_socio = ?
+             ORDER BY p.anio DESC, m.numero_mes DESC, p.id_pago DESC"
+        );
+        $stmt->execute([$id]);
+        $pagos = $stmt->fetchAll();
+        $pagados = [];
+        foreach ($pagos as &$pago) {
+            $pago['id_pago'] = (int)$pago['id_pago'];
+            $pago['id_categoria'] = (int)$pago['id_categoria'];
+            $pago['anio'] = (int)$pago['anio'];
+            $pago['id_mes'] = (int)$pago['id_mes'];
+            $pago['monto'] = (float)$pago['monto'];
+            if (in_array($pago['estado'], ['PAGADO', 'CONDONADO'], true)) {
+                $pagados[$pago['id_categoria'] . ':' . $pago['anio'] . ':' . $pago['id_mes']] = true;
+            }
+        }
+        unset($pago);
+
+        $stmt = $db->prepare(
+            "SELECT pi.id_pago_inscripcion, pi.id_categoria,
+                    COALESCE(pi.categoria_nombre_snapshot, c.nombre) AS categoria,
+                    pi.anio, pi.descripcion, pi.monto, pi.fecha_pago, pi.estado,
+                    COALESCE(pi.medio_pago_nombre_snapshot, mp.nombre) AS medio_pago
+             FROM pagos_inscripciones pi
+             INNER JOIN categorias c ON c.id_categoria = pi.id_categoria
+             INNER JOIN medios_pago mp ON mp.id_medio_pago = pi.id_medio_pago
+             WHERE pi.id_socio = ?
+             ORDER BY pi.anio DESC, pi.fecha_pago DESC, pi.id_pago_inscripcion DESC"
+        );
+        $stmt->execute([$id]);
+        $inscripciones = $stmt->fetchAll();
+        foreach ($inscripciones as &$inscripcion) {
+            $inscripcion['id_pago_inscripcion'] = (int)$inscripcion['id_pago_inscripcion'];
+            $inscripcion['id_categoria'] = (int)$inscripcion['id_categoria'];
+            $inscripcion['anio'] = (int)$inscripcion['anio'];
+            $inscripcion['monto'] = (float)$inscripcion['monto'];
+        }
+        unset($inscripcion);
+
+        $hoy = new DateTimeImmutable('today');
+        $pendientes = [];
+        foreach ($asignaciones as $asignacion) {
+            $inicioAsignacion = new DateTimeImmutable($asignacion['fecha_desde']);
+            $finAsignacion = $asignacion['fecha_hasta'] ? new DateTimeImmutable($asignacion['fecha_hasta']) : $hoy;
+            if ($finAsignacion > $hoy) $finAsignacion = $hoy;
+
+            foreach ($periodos as $periodo) {
+                $inicioPeriodo = new DateTimeImmutable($periodo['vigente_desde']);
+                $finPeriodo = $periodo['vigente_hasta'] ? new DateTimeImmutable($periodo['vigente_hasta']) : $hoy;
+                if ($finPeriodo > $hoy) $finPeriodo = $hoy;
+
+                $inicio = $inicioAsignacion > $inicioPeriodo ? $inicioAsignacion : $inicioPeriodo;
+                $fin = $finAsignacion < $finPeriodo ? $finAsignacion : $finPeriodo;
+                if ($inicio > $fin) continue;
+
+                $cursor = $inicio->modify('first day of this month');
+                $limite = $fin->modify('first day of this month');
+                while ($cursor <= $limite) {
+                    $anio = (int)$cursor->format('Y');
+                    $mes = (int)$cursor->format('n');
+                    $clave = $asignacion['id_categoria'] . ':' . $anio . ':' . $mes;
+                    if (!isset($pagados[$clave])) {
+                        $pendientes[$clave] = [
+                            'id_categoria' => $asignacion['id_categoria'],
+                            'categoria' => $asignacion['categoria'],
+                            'anio' => $anio,
+                            'id_mes' => $mes,
+                            'mes' => ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'][$mes - 1],
+                        ];
+                    }
+                    $cursor = $cursor->modify('+1 month');
+                }
+            }
+        }
+
+        $pendientes = array_values($pendientes);
+        usort($pendientes, static fn(array $a, array $b): int => [$b['anio'], $b['id_mes'], $b['categoria']] <=> [$a['anio'], $a['id_mes'], $a['categoria']]);
+
+        $pagosVigentes = array_values(array_filter($pagos, static fn(array $p): bool => in_array($p['estado'], ['PAGADO', 'CONDONADO'], true)));
+        return [
+            'socio' => $socio,
+            'resumen' => [
+                'estado_cuenta' => count($pendientes) === 0 ? 'AL_DIA' : 'CON_DEUDA',
+                'cuotas_pendientes' => count($pendientes),
+                'cuotas_pagadas' => count($pagosVigentes),
+                'periodos_activos' => count($periodos),
+                'activo_actualmente' => (bool)$socio['activo'],
+            ],
+            'periodos' => $periodos,
+            'categorias' => $asignaciones,
+            'pagos' => $pagos,
+            'pendientes' => $pendientes,
+            'inscripciones' => $inscripciones,
+        ];
+    }
+
 }

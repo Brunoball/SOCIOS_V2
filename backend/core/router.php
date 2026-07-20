@@ -20,7 +20,16 @@ final class Router
         $route = $this->routes[$action];
         $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
         if ($method !== $route['method']) json_response(['exito' => false, 'mensaje' => 'Método HTTP no permitido.'], 405);
-        if ($route['protected']) require_auth();
+        if ($route['protected']) {
+            $auth = require_auth();
+            if ($method !== 'GET' && ($auth['auth_source'] ?? '') === 'cookie') {
+                api_error(
+                    'Por seguridad, actualizá la página e iniciá sesión nuevamente antes de modificar información.',
+                    'CSRF_PROTECTION',
+                    403
+                );
+            }
+        }
         ($route['handler'])();
         json_response(['exito' => true]);
     }
