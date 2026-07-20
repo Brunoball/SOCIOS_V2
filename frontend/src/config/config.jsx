@@ -7,3 +7,5 @@ export default BASE_URL;
 
 //usuario: admin_socio
 //contraseña: @Socios_2026
+
+
