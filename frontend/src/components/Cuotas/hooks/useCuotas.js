@@ -12,6 +12,14 @@ export function useCuotas(filtros = {}) {
     const currentRequest = ++requestId.current;
     setLoading(true);
     setError("");
+    // Evita renderizar durante un cambio de pestaña los registros de la
+    // consulta anterior, que tienen otra estructura y pueden generar filas
+    // duplicadas o claves React inválidas.
+    setResponse((current) => ({
+      items: [],
+      resumen: {},
+      catalogos: current.catalogos || { categorias: [] },
+    }));
     try {
       const result = await cuotasApi.listar(JSON.parse(query));
       if (currentRequest === requestId.current) {

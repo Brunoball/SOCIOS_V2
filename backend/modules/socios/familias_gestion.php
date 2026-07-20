@@ -43,12 +43,28 @@ trait FamiliasGestion
                      FROM familia_socios fs
                      INNER JOIN socios s ON s.id_socio = fs.id_socio
                      INNER JOIN familias f ON f.id_familia = fs.id_familia
-                     WHERE fs.id_socio IN ({$placeholders}) AND fs.id_familia <> ? LIMIT 1"
+                     WHERE fs.id_socio IN ({$placeholders})
+                       AND fs.id_familia <> ?
+                       AND f.activo = 1
+                     LIMIT 1"
                 );
                 $conflicts->execute(array_merge($memberIds, [$id ?? 0]));
                 if ($conflict = $conflicts->fetch()) {
                     api_error("{$conflict['apellido']}, {$conflict['nombre']} ya pertenece a {$conflict['familia']}.", 'SOCIO_YA_TIENE_FAMILIA');
                 }
+
+                // Una familia dada de baja no debe retener al socio para siempre.
+                // La relación anterior se conserva mientras no se lo reasigne; al
+                // elegirlo para otra familia activa se libera automáticamente.
+                $releaseInactive = $db->prepare(
+                    "DELETE fs
+                     FROM familia_socios fs
+                     INNER JOIN familias f ON f.id_familia = fs.id_familia
+                     WHERE fs.id_socio IN ({$placeholders})
+                       AND fs.id_familia <> ?
+                       AND f.activo = 0"
+                );
+                $releaseInactive->execute(array_merge($memberIds, [$id ?? 0]));
 
                 $before = null;
                 if ($id === null) {

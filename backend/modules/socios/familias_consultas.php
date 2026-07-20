@@ -65,7 +65,8 @@ trait FamiliasConsultas
     private static function sociosCatalogo(PDO $db): array
     {
         $rows = $db->query(
-            'SELECT s.id_socio, s.apellido, s.nombre, s.dni, s.activo, fs.id_familia, f.nombre AS familia
+            'SELECT s.id_socio, s.apellido, s.nombre, s.dni, s.activo, fs.id_familia,
+                    f.nombre AS familia, f.activo AS familia_activa
              FROM socios s
              LEFT JOIN familia_socios fs ON fs.id_socio = s.id_socio
              LEFT JOIN familias f ON f.id_familia = fs.id_familia
@@ -75,6 +76,7 @@ trait FamiliasConsultas
             $row['id_socio'] = (int)$row['id_socio'];
             $row['id_familia'] = $row['id_familia'] === null ? null : (int)$row['id_familia'];
             $row['activo'] = (bool)$row['activo'];
+            $row['familia_activa'] = $row['familia_activa'] === null ? null : (bool)$row['familia_activa'];
         }
         unset($row);
         return $rows;

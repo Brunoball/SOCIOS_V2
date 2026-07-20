@@ -33,11 +33,11 @@ trait SociosConsultas
             $params['localidad'] = $location;
         }
         if (($family = (int)($filters['familia'] ?? 0)) > 0) {
-            $where[] = 'fs.id_familia = :familia';
+            $where[] = 'f.id_familia = :familia';
             $params['familia'] = $family;
         }
         if (trim((string)($filters['familia'] ?? '')) === 'sin_familia') {
-            $where[] = 'fs.id_familia IS NULL';
+            $where[] = 'f.id_familia IS NULL';
         }
 
         $from = trim((string)($filters['ingreso_desde'] ?? ''));
@@ -66,9 +66,11 @@ trait SociosConsultas
             'SELECT COUNT(*) AS total,
                     SUM(s.activo = 1) AS activos,
                     SUM(s.activo = 0) AS inactivos,
-                    SUM(s.activo = 1 AND fs.id_familia IS NULL) AS sin_familia,
+                    SUM(s.activo = 1 AND f.id_familia IS NULL) AS sin_familia,
                     SUM(s.activo = 1 AND s.fecha_ingreso >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)) AS altas_recientes
-             FROM socios s LEFT JOIN familia_socios fs ON fs.id_socio = s.id_socio'
+             FROM socios s
+             LEFT JOIN familia_socios fs ON fs.id_socio = s.id_socio
+             LEFT JOIN familias f ON f.id_familia = fs.id_familia AND f.activo = 1'
         )->fetch();
         $families = (int)$db->query('SELECT COUNT(*) FROM familias WHERE activo = 1')->fetchColumn();
 
@@ -127,7 +129,7 @@ trait SociosConsultas
                 FROM socios s
                 INNER JOIN localidades l ON l.id_localidad = s.id_localidad
                 LEFT JOIN familia_socios fs ON fs.id_socio = s.id_socio
-                LEFT JOIN familias f ON f.id_familia = fs.id_familia
+                LEFT JOIN familias f ON f.id_familia = fs.id_familia AND f.activo = 1
                 LEFT JOIN socio_categorias sc ON sc.id_socio = s.id_socio
                 LEFT JOIN categorias c ON c.id_categoria = sc.id_categoria
                 {$extraWhere}
@@ -187,6 +189,30 @@ trait SociosConsultas
         }
         unset($asignacion);
 
+        // La ficha usa exactamente los mismos períodos válidos que Cuotas:
+        // asignación del socio + actividad del socio + actividad de la categoría.
+        $periodosCategoria = [];
+        $categoriaIds = array_values(array_unique(array_map(
+            static fn(array $item): int => (int)$item['id_categoria'],
+            $asignaciones
+        )));
+        if ($categoriaIds !== []) {
+            $placeholders = implode(',', array_fill(0, count($categoriaIds), '?'));
+            $stmt = $db->prepare(
+                "SELECT id_periodo, id_categoria, vigente_desde, vigente_hasta
+                 FROM categorias_periodos_activos
+                 WHERE id_categoria IN ({$placeholders})
+                 ORDER BY id_categoria, vigente_desde, id_periodo"
+            );
+            $stmt->execute($categoriaIds);
+            foreach ($stmt->fetchAll() as $periodoCategoria) {
+                $categoryId = (int)$periodoCategoria['id_categoria'];
+                $periodoCategoria['id_periodo'] = (int)$periodoCategoria['id_periodo'];
+                $periodoCategoria['id_categoria'] = $categoryId;
+                $periodosCategoria[$categoryId][] = $periodoCategoria;
+            }
+        }
+
         $stmt = $db->prepare(
             "SELECT p.id_pago, p.id_categoria, COALESCE(p.categoria_nombre_snapshot, c.nombre) AS categoria,
                     p.anio, p.id_mes, m.nombre AS mes, p.monto, p.fecha_pago, p.estado,
@@ -242,30 +268,43 @@ trait SociosConsultas
             if ($finAsignacion > $hoy) $finAsignacion = $hoy;
 
             foreach ($periodos as $periodo) {
-                $inicioPeriodo = new DateTimeImmutable($periodo['vigente_desde']);
-                $finPeriodo = $periodo['vigente_hasta'] ? new DateTimeImmutable($periodo['vigente_hasta']) : $hoy;
-                if ($finPeriodo > $hoy) $finPeriodo = $hoy;
+                $inicioSocio = new DateTimeImmutable($periodo['vigente_desde']);
+                $finSocio = $periodo['vigente_hasta'] ? new DateTimeImmutable($periodo['vigente_hasta']) : $hoy;
+                if ($finSocio > $hoy) $finSocio = $hoy;
 
-                $inicio = $inicioAsignacion > $inicioPeriodo ? $inicioAsignacion : $inicioPeriodo;
-                $fin = $finAsignacion < $finPeriodo ? $finAsignacion : $finPeriodo;
-                if ($inicio > $fin) continue;
+                foreach ($periodosCategoria[(int)$asignacion['id_categoria']] ?? [] as $periodoCategoria) {
+                    $inicioCategoria = new DateTimeImmutable($periodoCategoria['vigente_desde']);
+                    $finCategoria = $periodoCategoria['vigente_hasta']
+                        ? new DateTimeImmutable($periodoCategoria['vigente_hasta'])
+                        : $hoy;
+                    if ($finCategoria > $hoy) $finCategoria = $hoy;
 
-                $cursor = $inicio->modify('first day of this month');
-                $limite = $fin->modify('first day of this month');
-                while ($cursor <= $limite) {
-                    $anio = (int)$cursor->format('Y');
-                    $mes = (int)$cursor->format('n');
-                    $clave = $asignacion['id_categoria'] . ':' . $anio . ':' . $mes;
-                    if (!isset($pagados[$clave])) {
-                        $pendientes[$clave] = [
-                            'id_categoria' => $asignacion['id_categoria'],
-                            'categoria' => $asignacion['categoria'],
-                            'anio' => $anio,
-                            'id_mes' => $mes,
-                            'mes' => ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'][$mes - 1],
-                        ];
+                    $inicio = $inicioAsignacion;
+                    if ($inicioSocio > $inicio) $inicio = $inicioSocio;
+                    if ($inicioCategoria > $inicio) $inicio = $inicioCategoria;
+
+                    $fin = $finAsignacion;
+                    if ($finSocio < $fin) $fin = $finSocio;
+                    if ($finCategoria < $fin) $fin = $finCategoria;
+                    if ($inicio > $fin) continue;
+
+                    $cursor = $inicio->modify('first day of this month');
+                    $limite = $fin->modify('first day of this month');
+                    while ($cursor <= $limite) {
+                        $anio = (int)$cursor->format('Y');
+                        $mes = (int)$cursor->format('n');
+                        $clave = $asignacion['id_categoria'] . ':' . $anio . ':' . $mes;
+                        if (!isset($pagados[$clave])) {
+                            $pendientes[$clave] = [
+                                'id_categoria' => $asignacion['id_categoria'],
+                                'categoria' => $asignacion['categoria'],
+                                'anio' => $anio,
+                                'id_mes' => $mes,
+                                'mes' => ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'][$mes - 1],
+                            ];
+                        }
+                        $cursor = $cursor->modify('+1 month');
                     }
-                    $cursor = $cursor->modify('+1 month');
                 }
             }
         }

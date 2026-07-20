@@ -323,3 +323,125 @@
     grid-template-columns: repeat(2, minmax(82px, 1fr));
   }
 }
+
+/* Modalidades de cobro: mensual, inscripción y paquetes semestrales/anuales. */
+.cuotas-payment-controls {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cuotas-modality-help {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--mov-border) 82%, #fff);
+  border-radius: 10px;
+  color: var(--balto-text);
+  background: color-mix(in srgb, var(--balto-bg) 42%, #fff);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.cuotas-modality-help strong {
+  color: var(--balto-action);
+}
+
+.cuotas-package-notice {
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid rgba(196, 139, 59, 0.3);
+  border-radius: 11px;
+  background: rgba(196, 139, 59, 0.08);
+}
+
+.cuotas-package-notice strong {
+  color: var(--balto-ink);
+  font-size: 12px;
+}
+
+.cuotas-package-notice span {
+  color: var(--balto-text);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.cuotas-month-grid button.is-package.is-selected:disabled {
+  border-color: rgba(196, 139, 59, 0.55);
+  color: var(--balto-ink);
+  background: rgba(196, 139, 59, 0.12);
+  cursor: default;
+  opacity: 1;
+}
+
+.cuotas-delete-package-warning {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(225, 61, 69, 0.28);
+  border-radius: 12px;
+  background: rgba(225, 61, 69, 0.06);
+}
+
+.cuotas-delete-package-warning > strong {
+  color: var(--balto-danger, #b52d35);
+  font-size: 13px;
+}
+
+.cuotas-delete-package-warning .entity-confirm-text {
+  margin: 0;
+}
+
+@media (max-width: 980px) {
+  .cuotas-payment-controls {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cuotas-year-control {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .cuotas-payment-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .cuotas-year-control {
+    grid-column: auto;
+  }
+}
+
+.cuotas-modality-selector {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.72fr) minmax(280px, 1.28fr);
+  gap: 14px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid rgba(196, 139, 59, 0.36);
+  border-radius: 13px;
+  background: rgba(196, 139, 59, 0.08);
+}
+
+.cuotas-modality-selector .entity-field {
+  margin: 0;
+}
+
+.cuotas-modality-selector select {
+  min-height: 42px;
+  font-weight: 700;
+}
+
+.cuotas-modality-selector small {
+  align-self: center;
+  color: var(--balto-text);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .cuotas-modality-selector {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+}

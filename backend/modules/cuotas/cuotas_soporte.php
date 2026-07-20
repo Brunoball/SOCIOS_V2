@@ -4,6 +4,8 @@ declare(strict_types=1);
 abstract class CuotasSoporte
 {
     protected const ESTADOS_REGISTRADOS = ['PAGADO', 'CONDONADO'];
+    protected const MODALIDADES_CUOTAS = ['MENSUAL', 'PRIMERA_MITAD', 'SEGUNDA_MITAD', 'CONTADO_ANUAL'];
+    protected const MODALIDADES_PAQUETE = ['PRIMERA_MITAD', 'SEGUNDA_MITAD', 'CONTADO_ANUAL'];
 
     protected static function allowedRecipients(PDO $db, int $principalId, bool $applyFamily): array
     {
@@ -92,6 +94,18 @@ abstract class CuotasSoporte
         return (bool)$statement->fetchColumn();
     }
 
+    protected static function hasRegisteredYear(PDO $db, int $partnerId, int $categoryId, int $year): bool
+    {
+        $statement = $db->prepare(
+            "SELECT 1 FROM pagos
+             WHERE id_socio = ? AND id_categoria = ? AND anio = ?
+               AND estado IN ('PAGADO','CONDONADO')
+             LIMIT 1"
+        );
+        $statement->execute([$partnerId, $categoryId, $year]);
+        return (bool)$statement->fetchColumn();
+    }
+
     protected static function validateAssignmentForPeriod(PDO $db, int $partnerId, int $categoryId, int $year, int $month): void
     {
         if (!self::hasAssignmentForPeriod($db, $partnerId, $categoryId, $year, $month)) {
@@ -143,34 +157,66 @@ abstract class CuotasSoporte
         return (int)$id;
     }
 
-    protected static function modalityIds(PDO $db): array
+    protected static function modalitiesMap(PDO $db): array
     {
-        $rows = $db->query("SELECT id_modalidad_pago, codigo FROM modalidades_pago WHERE activo = 1")->fetchAll();
+        $rows = $db->query(
+            "SELECT id_modalidad_pago, codigo, nombre, mes_desde, mes_hasta, cantidad_meses
+             FROM modalidades_pago
+             WHERE activo = 1
+             ORDER BY id_modalidad_pago"
+        )->fetchAll();
         $map = [];
-        foreach ($rows as $row) $map[$row['codigo']] = (int)$row['id_modalidad_pago'];
-        foreach (['MENSUAL', 'PRIMERA_MITAD', 'SEGUNDA_MITAD', 'CONTADO_ANUAL'] as $required) {
-            if (!isset($map[$required])) api_error('Falta configurar la modalidad ' . $required . '.', 'MODALIDAD_NO_CONFIGURADA', 500);
+        foreach ($rows as $row) {
+            $code = self::upper((string)$row['codigo']);
+            $map[$code] = [
+                'id_modalidad_pago' => (int)$row['id_modalidad_pago'],
+                'codigo' => $code,
+                'nombre' => (string)$row['nombre'],
+                'mes_desde' => $row['mes_desde'] === null ? null : (int)$row['mes_desde'],
+                'mes_hasta' => $row['mes_hasta'] === null ? null : (int)$row['mes_hasta'],
+                'cantidad_meses' => (int)$row['cantidad_meses'],
+            ];
         }
         return $map;
     }
 
-    protected static function modalityByObligation(array $obligations, array $modalities): array
+    protected static function paymentModality(PDO $db, mixed $value): array
     {
-        $monthsByGroup = [];
-        foreach ($obligations as $obligation) {
-            $key = $obligation['id_socio'] . '-' . $obligation['id_categoria'] . '-' . $obligation['anio'];
-            $monthsByGroup[$key][$obligation['id_mes']] = $obligation['id_mes'];
+        $code = self::upper(clean_text($value ?? 'MENSUAL', 40, false));
+        if (!in_array($code, self::MODALIDADES_CUOTAS, true)) {
+            api_error('La modalidad de pago seleccionada no es válida.', 'MODALIDAD_INVALIDA');
         }
-        $result = ['default' => $modalities['MENSUAL']];
-        foreach ($monthsByGroup as $key => $months) {
-            sort($months);
-            $code = 'MENSUAL';
-            if ($months === range(1, 12)) $code = 'CONTADO_ANUAL';
-            elseif ($months === range(1, 6)) $code = 'PRIMERA_MITAD';
-            elseif ($months === range(7, 12)) $code = 'SEGUNDA_MITAD';
-            $result[$key] = $modalities[$code];
+        $modalities = self::modalitiesMap($db);
+        if (!isset($modalities[$code])) {
+            api_error('Falta configurar la modalidad ' . $code . '.', 'MODALIDAD_NO_CONFIGURADA', 500);
         }
-        return $result;
+        return $modalities[$code];
+    }
+
+    protected static function modalityMonths(string $code): array
+    {
+        return match ($code) {
+            'PRIMERA_MITAD' => range(1, 6),
+            'SEGUNDA_MITAD' => range(7, 12),
+            'CONTADO_ANUAL' => range(1, 12),
+            default => [],
+        };
+    }
+
+    protected static function isPackageModality(string $code): bool
+    {
+        return in_array($code, self::MODALIDADES_PAQUETE, true);
+    }
+
+    protected static function modalityLabel(string $code): string
+    {
+        return match ($code) {
+            'PRIMERA_MITAD' => 'PRIMERA MITAD',
+            'SEGUNDA_MITAD' => 'SEGUNDA MITAD',
+            'CONTADO_ANUAL' => 'CONTADO ANUAL',
+            'INSCRIPCION' => 'INSCRIPCIÓN',
+            default => 'CUOTAS MENSUALES',
+        };
     }
 
     protected static function categoryMap(PDO $db, array $categoryIds): array

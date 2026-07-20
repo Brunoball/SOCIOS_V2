@@ -24,6 +24,30 @@ const today = () => {
 const currentDate = new Date();
 const currentYear = currentDate.getFullYear();
 const currentMonth = currentDate.getMonth() + 1;
+const PACKAGE_MODALITY_MONTHS = {
+  PRIMERA_MITAD: [1, 2, 3, 4, 5, 6],
+  SEGUNDA_MITAD: [7, 8, 9, 10, 11, 12],
+  CONTADO_ANUAL: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+};
+const FALLBACK_MODALITIES = [
+  { codigo: "MENSUAL", nombre: "CUOTAS MENSUALES" },
+  { codigo: "PRIMERA_MITAD", nombre: "PRIMERA MITAD" },
+  { codigo: "SEGUNDA_MITAD", nombre: "SEGUNDA MITAD" },
+  { codigo: "CONTADO_ANUAL", nombre: "CONTADO ANUAL" },
+  { codigo: "INSCRIPCION", nombre: "INSCRIPCIÓN" },
+];
+const modalityOptionLabel = (item) => {
+  switch (item.codigo) {
+    case "PRIMERA_MITAD":
+      return `${item.nombre} · ENERO A JUNIO`;
+    case "SEGUNDA_MITAD":
+      return `${item.nombre} · JULIO A DICIEMBRE`;
+    case "CONTADO_ANUAL":
+      return `${item.nombre} · ENERO A DICIEMBRE`;
+    default:
+      return item.nombre;
+  }
+};
 const money = (value) =>
   new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(
     Number(value || 0),
@@ -83,7 +107,7 @@ function excelDownload(filename, headers, rows) {
 }
 
 const emptyPaymentForm = () => ({
-  tipo: "cuotas",
+  modalidad: "MENSUAL",
   aplicar_familia: false,
   id_categoria: "",
   anio: String(currentYear),
@@ -104,6 +128,7 @@ export default function Cuotas() {
   const [category, setCategory] = useState("");
   const [year, setYear] = useState(String(currentYear));
   const [month, setMonth] = useState(String(currentMonth));
+  const [modality, setModality] = useState("");
   const filters = useMemo(
     () => ({
       pestana: tab,
@@ -111,8 +136,9 @@ export default function Cuotas() {
       categoria: category,
       anio: year,
       mes: month,
+      modalidad: tab === "deudores" ? "" : modality,
     }),
-    [tab, search, category, year, month],
+    [tab, search, category, year, month, modality],
   );
   const { items, catalogos, loading, error, cargar } = useCuotas(filters);
   const [fullCatalogs, setFullCatalogs] = useState({
@@ -127,7 +153,6 @@ export default function Cuotas() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentDetail, setPaymentDetail] = useState(null);
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm());
-  const [enablingYear, setEnablingYear] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteModal, setDeleteModal] = useState(null);
 
@@ -159,7 +184,6 @@ export default function Cuotas() {
     setPickerOpen(false);
     setPaymentOpen(true);
     setPaymentLoading(true);
-    setEnablingYear(false);
     setPaymentDetail(null);
     setFeedback(null);
     try {
@@ -205,25 +229,10 @@ export default function Cuotas() {
     setPaymentForm((current) => ({
       ...current,
       anio: value,
+      modalidad: "MENSUAL",
       seleccion: {},
       descripcion_inscripcion: `INSCRIPCIÓN ${value}`,
     }));
-  };
-
-  const enableNextYear = async () => {
-    const nextYear = Number(paymentDetail?.siguiente_anio_habilitable || 0);
-    const partnerId = paymentDetail?.socio?.id_socio;
-    if (!nextYear || !partnerId || enablingYear) return;
-    setEnablingYear(true);
-    try {
-      const detail = await cuotasApi.detalleSocio(partnerId, nextYear);
-      setPaymentDetail(detail);
-      changePaymentYear(String(nextYear));
-    } catch (err) {
-      setFeedback({ type: "error", message: err.message });
-    } finally {
-      setEnablingYear(false);
-    }
   };
 
   const updateForm = (key, value) =>
@@ -233,6 +242,7 @@ export default function Cuotas() {
     setPaymentForm((current) => ({
       ...current,
       id_categoria: value,
+      modalidad: "MENSUAL",
       seleccion: {},
     }));
 
@@ -266,7 +276,12 @@ export default function Cuotas() {
           selection[period.clave] = true;
         }
       });
-      return { ...current, aplicar_familia: checked, seleccion: selection };
+      return {
+        ...current,
+        aplicar_familia: checked,
+        modalidad: "MENSUAL",
+        seleccion: selection,
+      };
     });
   };
 
@@ -394,18 +409,122 @@ export default function Cuotas() {
     paymentForm.anio,
   ]);
 
+  const availableModalities = useMemo(() => {
+    if (!paymentDetail) return [];
+    const configured = paymentDetail.modalidades?.length
+      ? paymentDetail.modalidades
+      : FALLBACK_MODALITIES;
+    const hasPendingMonthly = visiblePeriods.some(
+      (period) => period.estado === "PENDIENTE",
+    );
+    const hasAnyRegisteredMonth = visiblePeriods.some(
+      (period) => period.estado !== "PENDIENTE",
+    );
+    const pendingRegistration = registrationRecipients.some(
+      (member) => member.estado === "PENDIENTE",
+    );
+    const packageAvailable = (code) => {
+      const months = PACKAGE_MODALITY_MONTHS[code] || [];
+      if (!months.length || !groupedPeriods.length) return false;
+      if (
+        ["PRIMERA_MITAD", "CONTADO_ANUAL"].includes(code) &&
+        hasAnyRegisteredMonth
+      ) {
+        return false;
+      }
+      return groupedPeriods.every((group) => {
+        const periodsByMonth = new Map(
+          group.periods.map((period) => [Number(period.id_mes), period]),
+        );
+        return months.every(
+          (monthNumber) =>
+            periodsByMonth.get(monthNumber)?.estado === "PENDIENTE",
+        );
+      });
+    };
+
+    return configured
+      .map((item) => ({
+        ...item,
+        codigo: String(item.codigo || "").toUpperCase(),
+        nombre:
+          String(item.codigo || "").toUpperCase() === "MENSUAL"
+            ? "CUOTAS MENSUALES"
+            : item.nombre,
+      }))
+      .filter((item) => {
+        if (item.codigo === "MENSUAL") return hasPendingMonthly;
+        if (item.codigo === "INSCRIPCION") return pendingRegistration;
+        return packageAvailable(item.codigo);
+      });
+  }, [
+    paymentDetail,
+    visiblePeriods,
+    groupedPeriods,
+    registrationRecipients,
+  ]);
+
+  const availableModalityCodes = useMemo(
+    () => availableModalities.map((item) => item.codigo),
+    [availableModalities],
+  );
+
+  useEffect(() => {
+    if (!paymentDetail || !availableModalityCodes.length) return;
+    if (availableModalityCodes.includes(paymentForm.modalidad)) return;
+    const fallback = availableModalityCodes.includes("MENSUAL")
+      ? "MENSUAL"
+      : availableModalityCodes[0];
+    setPaymentForm((current) => ({
+      ...current,
+      modalidad: fallback,
+      seleccion: {},
+    }));
+  }, [
+    paymentDetail,
+    availableModalityCodes,
+    paymentForm.modalidad,
+  ]);
+
+  const changePaymentModality = (code) => {
+    const months = PACKAGE_MODALITY_MONTHS[code] || [];
+    const selection = {};
+    if (months.length) {
+      const allowedMonths = new Set(months);
+      visiblePeriods.forEach((period) => {
+        if (
+          period.estado === "PENDIENTE" &&
+          allowedMonths.has(Number(period.id_mes))
+        ) {
+          selection[period.clave] = true;
+        }
+      });
+    }
+    setPaymentForm((current) => ({
+      ...current,
+      modalidad: code,
+      seleccion: selection,
+    }));
+  };
+
+  const isRegistrationMode = paymentForm.modalidad === "INSCRIPCION";
+  const isPackageMode = Boolean(
+    PACKAGE_MODALITY_MONTHS[paymentForm.modalidad],
+  );
+
   const savePayment = async (event) => {
     event.preventDefault();
     if (!paymentDetail) return;
     setSaving(true);
     try {
       let response;
-      if (paymentForm.tipo === "cuotas") {
+      if (!isRegistrationMode) {
         if (!selectedPeriods.length)
           throw new Error("Seleccioná al menos un mes pendiente.");
         response = await cuotasApi.registrarPago({
           id_socio: paymentDetail.socio.id_socio,
           aplicar_familia: paymentForm.aplicar_familia,
+          modalidad: paymentForm.modalidad,
           obligaciones: selectedPeriods.map(
             ({ id_socio, id_categoria, anio, id_mes }) => ({
               id_socio,
@@ -450,7 +569,7 @@ export default function Cuotas() {
       setPaymentOpen(false);
       setFeedback({
         type: "success",
-        message: `${response.mensaje} Operación ${response.codigo_operacion}.`,
+        message: response.mensaje,
       });
       await cargar();
     } catch (err) {
@@ -501,8 +620,8 @@ export default function Cuotas() {
         )
         .join("");
       printDocument(
-        `Comprobante ${item.codigo_operacion}`,
-        `<div class="head"><div><h1>${escapeHtml(response.organizacion)}</h1><p>Comprobante de ${escapeHtml(item.concepto.toLowerCase())}</p></div><div class="meta"><b>${escapeHtml(item.codigo_operacion)}</b><p>${escapeHtml(formatDate(item.fecha_pago))}</p><span class="badge">${escapeHtml(item.estado)}</span></div></div><div class="summary"><div><span>Socios</span><b>${escapeHtml(item.socios_label)}</b></div><div><span>Medio</span><b>${escapeHtml(item.medio_pago)}</b></div><div><span>Total cobrado</span><b>${escapeHtml(money(item.monto))}</b></div></div>${item.motivo_condonacion ? `<p><b>Motivo de condonación:</b> ${escapeHtml(item.motivo_condonacion)}</p>` : ""}<table><thead><tr><th>Socio</th><th>Categoría</th><th>Período</th><th class="right">Base</th><th class="right">Desc.</th><th class="right">Cobrado</th></tr></thead><tbody>${lines}</tbody></table>${item.observaciones ? `<p class="foot"><b>Observaciones:</b> ${escapeHtml(item.observaciones)}</p>` : ""}`,
+        "Comprobante de pago",
+        `<div class="head"><div><h1>${escapeHtml(response.organizacion)}</h1><p>Comprobante de ${escapeHtml(item.concepto.toLowerCase())}</p></div><div class="meta"><p>${escapeHtml(formatDate(item.fecha_pago))}</p><span class="badge">${escapeHtml(item.estado)}</span></div></div><div class="summary"><div><span>Socios</span><b>${escapeHtml(item.socios_label)}</b></div><div><span>Modalidad</span><b>${escapeHtml(item.modalidad_label || item.concepto)}</b></div><div><span>Medio</span><b>${escapeHtml(item.medio_pago)}</b></div><div><span>Total cobrado</span><b>${escapeHtml(money(item.monto))}</b></div></div>${item.motivo_condonacion ? `<p><b>Motivo de condonación:</b> ${escapeHtml(item.motivo_condonacion)}</p>` : ""}<table><thead><tr><th>Socio</th><th>Categoría</th><th>Período</th><th class="right">Base</th><th class="right">Desc.</th><th class="right">Cobrado</th></tr></thead><tbody>${lines}</tbody></table>${item.observaciones ? `<p class="foot"><b>Observaciones:</b> ${escapeHtml(item.observaciones)}</p>` : ""}`,
         popup,
       );
     } catch (err) {
@@ -539,6 +658,7 @@ export default function Cuotas() {
           headers: [
             "Socio",
             "DNI",
+            "Modalidad",
             "Períodos",
             "Categorías",
             "Fecha",
@@ -550,6 +670,7 @@ export default function Cuotas() {
           rows: items.map((item) => [
             item.socio,
             item.dni,
+            item.modalidad_label || item.concepto,
             item.periodos_label,
             item.categorias_label,
             formatDate(item.fecha_pago),
@@ -564,7 +685,19 @@ export default function Cuotas() {
     (catalogos.meses || []).find(
       (item) => String(item.id_mes) === String(month),
     )?.nombre || "";
-  const appliedFilterLabel = [`AÑO ${year}`, selectedMonthLabel].join(" · ");
+  const selectedModalityLabel =
+    (catalogos.modalidades || []).find(
+      (item) => String(item.codigo) === String(modality),
+    )?.nombre || "";
+  const appliedFilterLabel = [
+    `AÑO ${year}`,
+    selectedMonthLabel,
+    tab !== "deudores" && selectedModalityLabel
+      ? selectedModalityLabel
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   const printTable = () => {
     const output = rowsForOutput();
@@ -598,6 +731,7 @@ export default function Cuotas() {
       value: tab,
       onChange: (value) => {
         setTab(value);
+        if (value === "deudores") setModality("");
         setFeedback(null);
       },
       options: [
@@ -626,6 +760,30 @@ export default function Cuotas() {
         label: `${item.nombre}${item.activo ? "" : " (BAJA)"}`,
       })),
     },
+    ...(tab !== "deudores"
+      ? [
+          {
+            key: "modalidad",
+            label: "Concepto / modalidad",
+            type: "select",
+            placeholder: "Todos",
+            value: modality,
+            onChange: setModality,
+            options: (catalogos.modalidades || FALLBACK_MODALITIES).map(
+              (item) => ({
+                value: item.codigo,
+                label: modalityOptionLabel({
+                  ...item,
+                  nombre:
+                    item.codigo === "MENSUAL"
+                      ? "CUOTAS MENSUALES"
+                      : item.nombre,
+                }),
+              }),
+            ),
+          },
+        ]
+      : []),
     {
       key: "anio",
       label: "Año aplicado",
@@ -740,11 +898,11 @@ export default function Cuotas() {
                   </span>
                 </div>
               ) : null}
-              {items.map((item) => (
+              {items.map((item, index) => (
                 <div
                   className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row cuotas-debt-grid"
                   role="row"
-                  key={`${item.id_socio}-${item.id_categoria}`}
+                  key={`deuda-${item.id_socio ?? item.socio ?? "socio"}-${item.id_categoria ?? item.categoria ?? "categoria"}-${item.primer_periodo?.anio ?? year}-${item.primer_periodo?.mes ?? month}-${index}`}
                 >
                   <div className="mov-gridCell entity-main-cell">
                     <strong>{item.socio}</strong>
@@ -812,7 +970,7 @@ export default function Cuotas() {
               >
                 {[
                   "Socio",
-                  "Períodos",
+                  "Modalidad / períodos",
                   "Categorías",
                   "Fecha",
                   "Medio de pago",
@@ -841,20 +999,19 @@ export default function Cuotas() {
                   </span>
                 </div>
               ) : null}
-              {items.map((item) => (
+              {items.map((item, index) => (
                 <div
                   className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row cuotas-operation-grid"
                   role="row"
-                  key={item.fila_id}
+                  key={item.fila_id || `operacion-${item.tipo_registro ?? "registro"}-${item.id_operacion ?? item.codigo_operacion ?? item.id_socio ?? item.socio ?? "socio"}-${item.fecha_pago ?? "fecha"}-${index}`}
                 >
                   <div className="mov-gridCell entity-main-cell">
                     <strong>{item.socio}</strong>
                     <small>DNI {item.dni}</small>
                   </div>
-                  <div className="mov-gridCell">
-                    <span className="entity-wrap-text">
-                      {item.periodos_label}
-                    </span>
+                  <div className="mov-gridCell entity-main-cell">
+                    <strong>{item.modalidad_label || item.concepto}</strong>
+                    <small>{item.periodos_label}</small>
                   </div>
                   <div className="mov-gridCell">
                     <span className="entity-wrap-text">
@@ -863,7 +1020,6 @@ export default function Cuotas() {
                   </div>
                   <div className="mov-gridCell entity-main-cell">
                     <strong>{formatDate(item.fecha_pago)}</strong>
-                    <small>{item.codigo_operacion}</small>
                   </div>
                   <div className="mov-gridCell">
                     <span className="entity-wrap-text">{item.medio_pago}</span>
@@ -974,7 +1130,9 @@ export default function Cuotas() {
           paymentForm.condonado ? "Registrar condonación" : "Registrar pago"
         }
         wide
-        hideSubmit={paymentLoading || !paymentDetail}
+        hideSubmit={
+          paymentLoading || !paymentDetail || !availableModalities.length
+        }
       >
         {paymentLoading ? (
           <p className="entity-confirm-text">
@@ -1018,26 +1176,33 @@ export default function Cuotas() {
               </div>
             )}
 
-            <div
-              className="mov-tabs cuotas-modal-tabs"
-              role="tablist"
-              aria-label="Tipo de pago"
-            >
-              <button
-                className={`mov-tab ${paymentForm.tipo === "cuotas" ? "is-active" : ""}`}
-                type="button"
-                onClick={() => updateForm("tipo", "cuotas")}
-              >
-                Cuotas mensuales
-              </button>
-              <button
-                className={`mov-tab ${paymentForm.tipo === "inscripcion" ? "is-active" : ""}`}
-                type="button"
-                onClick={() => updateForm("tipo", "inscripcion")}
-              >
-                Inscripción
-              </button>
-            </div>
+            <section className="cuotas-modality-selector" aria-label="Modalidad de cobro">
+              <label className="entity-field">
+                <span>Concepto / modalidad de cobro *</span>
+                <select
+                  value={paymentForm.modalidad}
+                  onChange={(event) =>
+                    changePaymentModality(event.target.value)
+                  }
+                  required
+                  disabled={!availableModalities.length}
+                >
+                  {!availableModalities.length ? (
+                    <option value="">SIN MODALIDADES DISPONIBLES</option>
+                  ) : null}
+                  {availableModalities.map((item) => (
+                    <option key={item.codigo} value={item.codigo}>
+                      {modalityOptionLabel(item)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <small>
+                Acá elegís CUOTAS MENSUALES, INSCRIPCIÓN, PRIMERA MITAD,
+                SEGUNDA MITAD o CONTADO ANUAL. Las opciones que no
+                corresponden para el socio y el año seleccionado se ocultan.
+              </small>
+            </section>
 
             <div className="entity-form__grid cuotas-payment-controls">
               <label className="entity-field">
@@ -1070,64 +1235,65 @@ export default function Cuotas() {
                     ))}
                   </select>
                 </label>
-                {paymentDetail.siguiente_anio_habilitable ? (
-                  <button
-                    className="mov-btn mov-btn--ghost cuotas-enable-year"
-                    type="button"
-                    onClick={enableNextYear}
-                    disabled={enablingYear}
-                  >
-                    {enablingYear
-                      ? "Habilitando..."
-                      : `Habilitar ${paymentDetail.siguiente_anio_habilitable}`}
-                  </button>
-                ) : (
-                  <span className="cuotas-year-enabled">
-                    AÑO {paymentDetail.anio_maximo_habilitado} HABILITADO
-                  </span>
-                )}
+                <span className="cuotas-year-enabled">
+                  AÑO {paymentDetail.anio_maximo_habilitado} HABILITADO
+                </span>
               </div>
             </div>
 
-            {paymentForm.tipo === "cuotas" ? (
+            <div className="cuotas-modality-help">
+              {availableModalities.length ? (
+                <span>
+                  Las modalidades se habilitan según la fecha de ingreso y los
+                  pagos del año. Las opciones que ya no corresponden no se
+                  muestran.
+                </span>
+              ) : (
+                <strong>
+                  No hay pagos o inscripciones pendientes para esta categoría
+                  y año.
+                </strong>
+              )}
+            </div>
+
+            {!isRegistrationMode ? (
               <>
-                <div className="cuotas-quick-actions">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      selectVisible(
-                        (period) => period.id_mes === new Date().getMonth() + 1,
-                      )
-                    }
-                  >
-                    Mes actual
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      selectVisible((period) => period.id_mes <= 6)
-                    }
-                  >
-                    1ª mitad
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      selectVisible((period) => period.id_mes >= 7)
-                    }
-                  >
-                    2ª mitad
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectVisible(() => true)}
-                  >
-                    Todo el año
-                  </button>
-                  <button type="button" onClick={clearVisible}>
-                    Limpiar visibles
-                  </button>
-                </div>
+                {isPackageMode ? (
+                  <div className="cuotas-package-notice">
+                    <strong>
+                      {availableModalities.find(
+                        (item) => item.codigo === paymentForm.modalidad,
+                      )?.nombre || "PAGO AGRUPADO"}
+                    </strong>
+                    <span>
+                      Los meses incluidos se seleccionan automáticamente y el
+                      registro se elimina siempre como un paquete completo.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="cuotas-quick-actions">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        selectVisible(
+                          (period) =>
+                            period.id_mes === new Date().getMonth() + 1,
+                        )
+                      }
+                    >
+                      Mes actual
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => selectVisible(() => true)}
+                    >
+                      Todos los pendientes
+                    </button>
+                    <button type="button" onClick={clearVisible}>
+                      Limpiar selección
+                    </button>
+                  </div>
+                )}
                 <div className="cuotas-period-list">
                   {groupedPeriods.map((group) => (
                     <section
@@ -1149,8 +1315,10 @@ export default function Cuotas() {
                           <button
                             type="button"
                             key={period.clave}
-                            disabled={period.estado !== "PENDIENTE"}
-                            className={`${paymentForm.seleccion[period.clave] ? "is-selected" : ""} ${period.estado !== "PENDIENTE" ? "is-disabled" : ""}`}
+                            disabled={
+                              period.estado !== "PENDIENTE" || isPackageMode
+                            }
+                            className={`${paymentForm.seleccion[period.clave] ? "is-selected" : ""} ${period.estado !== "PENDIENTE" ? "is-disabled" : ""} ${isPackageMode ? "is-package" : ""}`}
                             onClick={() => togglePeriod(period)}
                           >
                             <strong>{period.mes.slice(0, 3)}</strong>
@@ -1176,7 +1344,7 @@ export default function Cuotas() {
                 </div>
                 <div className="cuotas-selection-summary">
                   <div>
-                    <span>Meses seleccionados</span>
+                    <span>{isPackageMode ? "Meses incluidos" : "Meses seleccionados"}</span>
                     <strong>{selectedPeriods.length}</strong>
                   </div>
                   <div>
@@ -1388,18 +1556,35 @@ export default function Cuotas() {
             ? "Eliminar condonación"
             : "Eliminar pago"
         }
-        subtitle={deleteModal?.codigo_operacion || ""}
+        subtitle={
+          deleteModal
+            ? `${deleteModal.modalidad_label || deleteModal.concepto} · ${deleteModal.periodos_label}`
+            : ""
+        }
         onClose={() => setDeleteModal(null)}
         onSubmit={confirmDelete}
         saving={saving}
         submitLabel="Eliminar registro"
         danger
       >
-        <p className="entity-confirm-text">
-          Se anularán únicamente las {deleteModal?.cantidad_lineas || 0} líneas
-          visibles de esta fila y se conservará la auditoría. Esos períodos
-          volverán a quedar pendientes y podrán pagarse nuevamente.
-        </p>
+        {deleteModal?.es_paquete ? (
+          <div className="cuotas-delete-package-warning">
+            <strong>
+              Este registro corresponde a {deleteModal.modalidad_label}.
+            </strong>
+            <p className="entity-confirm-text">
+              Al eliminarlo se anulará el paquete completo de {deleteModal.cantidad_lineas || 0}{" "}
+              meses, aunque hayas abierto la acción desde un mes puntual. Todos
+              esos meses volverán a quedar pendientes.
+            </p>
+          </div>
+        ) : (
+          <p className="entity-confirm-text">
+            Se anularán las {deleteModal?.cantidad_lineas || 0} líneas incluidas
+            en esta fila y se conservará la auditoría. Esos períodos volverán a
+            quedar pendientes y podrán pagarse nuevamente.
+          </p>
+        )}
       </CrudModal>
     </>
   );

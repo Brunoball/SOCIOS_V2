@@ -11,21 +11,31 @@ abstract class CuotasConsultas extends CuotasSoporte
         if (!in_array($tab, ['deudores', 'pagados', 'condonados'], true)) {
             api_error('La pestaña solicitada no es válida.', 'FILTRO_INVALIDO');
         }
+
         $search = clean_text($filters['buscar'] ?? '', 160, false);
         $categoryId = trim((string)($filters['categoria'] ?? ''));
         $categoryId = $categoryId === '' ? null : positive_id($categoryId, 'categoría');
+
         $yearText = trim((string)($filters['anio'] ?? ''));
         $year = $yearText === '' ? null : filter_var($yearText, FILTER_VALIDATE_INT, [
-            'options' => ['min_range' => 2000, 'max_range' => (int)date('Y') + 1],
+            'options' => ['min_range' => 2000, 'max_range' => (int)date('Y')],
         ]);
         if ($year === false) api_error('El año seleccionado no es válido.', 'FILTRO_INVALIDO');
         $year = $year === null ? null : (int)$year;
+
         $monthText = trim((string)($filters['mes'] ?? ''));
         $month = $monthText === '' ? null : filter_var($monthText, FILTER_VALIDATE_INT, [
             'options' => ['min_range' => 1, 'max_range' => 12],
         ]);
         if ($month === false) api_error('El mes seleccionado no es válido.', 'FILTRO_INVALIDO');
         $month = $month === null ? null : (int)$month;
+
+        $modalityText = self::upper(clean_text($filters['modalidad'] ?? '', 40, false));
+        $allowedModalities = ['', 'MENSUAL', 'PRIMERA_MITAD', 'SEGUNDA_MITAD', 'CONTADO_ANUAL', 'INSCRIPCION'];
+        if (!in_array($modalityText, $allowedModalities, true)) {
+            api_error('La modalidad seleccionada no es válida.', 'FILTRO_INVALIDO');
+        }
+        $modality = $modalityText === '' ? null : $modalityText;
 
         $result = $tab === 'deudores'
             ? self::listarDeudores($db, $search, $categoryId, $year, $month)
@@ -35,15 +45,21 @@ abstract class CuotasConsultas extends CuotasSoporte
                 $search,
                 $categoryId,
                 $year,
-                $month
+                $month,
+                $modality
             );
 
         $result['catalogos'] = [
             'categorias' => self::categoriasCatalogo($db, false),
             'anios' => self::aniosCatalogo($db),
             'meses' => self::mesesCatalogo($db),
+            'modalidades' => self::modalidadesCatalogo($db),
         ];
-        $result['filtros'] = ['anio' => $year, 'mes' => $month];
+        $result['filtros'] = [
+            'anio' => $year,
+            'mes' => $month,
+            'modalidad' => $modality,
+        ];
         return $result;
     }
 
@@ -226,34 +242,97 @@ abstract class CuotasConsultas extends CuotasSoporte
         string $search,
         ?int $categoryId,
         ?int $selectedYear,
-        ?int $selectedMonth
+        ?int $selectedMonth,
+        ?string $selectedModality = null
     ): array
     {
-        $rows = array_merge(self::paymentRows($db, $status), self::registrationRows($db, $status));
-        $rows = array_values(array_filter($rows, static function (array $row) use ($categoryId, $selectedYear, $selectedMonth): bool {
-            if ($categoryId !== null && (int)$row['id_categoria'] !== $categoryId) return false;
-            if ($selectedYear !== null && (int)$row['anio'] !== $selectedYear) return false;
-            if ($selectedMonth !== null && $row['tipo_registro'] === 'CUOTA') {
-                if ((int)$row['id_mes'] !== $selectedMonth) return false;
+        $rows = array_merge(
+            self::paymentRows($db, $status),
+            self::registrationRows($db, $status)
+        );
+
+        // El filtro se aplica sobre las líneas antes de agrupar. Los paquetes
+        // semestrales/anuales se conservan completos cuando incluyen el mes
+        // consultado, de manera que una anulación nunca corte solo una parte.
+        $rows = array_values(array_filter(
+            $rows,
+            static function (array $row) use (
+                $categoryId,
+                $selectedYear,
+                $selectedMonth,
+                $selectedModality
+            ): bool {
+                if ($categoryId !== null && (int)$row['id_categoria'] !== $categoryId) {
+                    return false;
+                }
+                if ($selectedYear !== null && (int)$row['anio'] !== $selectedYear) {
+                    return false;
+                }
+
+                $modalityCode = self::upper((string)(
+                    $row['modalidad_codigo']
+                    ?? ($row['tipo_registro'] === 'INSCRIPCION' ? 'INSCRIPCION' : 'MENSUAL')
+                ));
+                if ($selectedModality !== null && $modalityCode !== $selectedModality) {
+                    return false;
+                }
+
+                if ($selectedMonth !== null && $row['tipo_registro'] === 'CUOTA') {
+                    if (
+                        !self::isPackageModality($modalityCode)
+                        && (int)$row['id_mes'] !== $selectedMonth
+                    ) {
+                        return false;
+                    }
+                }
+                return true;
             }
-            return true;
-        }));
+        ));
+
         $operations = self::groupOperations($rows, true);
+        if ($selectedMonth !== null) {
+            $operations = array_values(array_filter(
+                $operations,
+                static function (array $operation) use ($selectedMonth): bool {
+                    if ($operation['tipo'] === 'INSCRIPCION' || !$operation['es_paquete']) {
+                        return true;
+                    }
+                    foreach ($operation['lineas'] as $line) {
+                        if ((int)($line['id_mes'] ?? 0) === $selectedMonth) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            ));
+        }
+
         $needle = self::lower($search);
-        $operations = array_values(array_filter($operations, static function (array $operation) use ($needle): bool {
-            if ($needle !== '' && !str_contains(self::lower($operation['busqueda']), $needle)) return false;
-            return true;
-        }));
+        $operations = array_values(array_filter(
+            $operations,
+            static function (array $operation) use ($needle): bool {
+                return $needle === ''
+                    || str_contains(self::lower((string)$operation['busqueda']), $needle);
+            }
+        ));
+
         usort($operations, static function (array $a, array $b): int {
-            $byOperation = strcmp($b['fecha_pago'] . $b['codigo_operacion'], $a['fecha_pago'] . $a['codigo_operacion']);
-            return $byOperation !== 0 ? $byOperation : strcmp($a['socios_label'], $b['socios_label']);
+            $byOperation = strcmp(
+                (string)$b['fecha_pago'] . (string)$b['codigo_operacion'],
+                (string)$a['fecha_pago'] . (string)$a['codigo_operacion']
+            );
+            return $byOperation !== 0
+                ? $byOperation
+                : strcmp((string)$a['socios_label'], (string)$b['socios_label']);
         });
+
         $collected = 0.0;
         $base = 0.0;
         foreach ($operations as $operation) {
             $collected += (float)$operation['monto'];
             $base += (float)$operation['monto_base'];
         }
+
         return [
             'items' => $operations,
             'resumen' => [
@@ -264,7 +343,7 @@ abstract class CuotasConsultas extends CuotasSoporte
         ];
     }
 
-    protected static function detalleSocioDatos(PDO $db, int $partnerId, int $enabledUntilYear): array
+    protected static function detalleSocioDatos(PDO $db, int $partnerId): array
     {
         $statement = $db->prepare('SELECT id_socio, apellido, nombre, dni, fecha_ingreso, activo FROM socios WHERE id_socio = ?');
         $statement->execute([$partnerId]);
@@ -335,7 +414,7 @@ abstract class CuotasConsultas extends CuotasSoporte
         $memberCount = count($members);
         $discount = $family ? self::discountForCount($rules, $memberCount) : 0.0;
         $currentYear = (int)date('Y');
-        $maximumEnabledYear = min(max($enabledUntilYear, $currentYear), $currentYear + 1);
+        $maximumEnabledYear = $currentYear;
         $endOfEnabledYear = new DateTimeImmutable($maximumEnabledYear . '-12-01');
         $periods = [];
         $earliestYear = $currentYear;
@@ -428,8 +507,8 @@ abstract class CuotasConsultas extends CuotasSoporte
             'inscripciones' => $registrations,
             'anios' => $years,
             'anio_maximo_habilitado' => $maximumEnabledYear,
-            'siguiente_anio_habilitable' => $maximumEnabledYear < $currentYear + 1 ? $currentYear + 1 : null,
             'medios_pago' => self::mediosPagoCatalogo($db),
+            'modalidades' => self::modalidadesCatalogo($db),
             'monto_inscripcion' => self::registrationAmount($db),
         ];
     }
@@ -451,7 +530,7 @@ abstract class CuotasConsultas extends CuotasSoporte
         )->fetchColumn();
         $firstYear = max(2000, min($currentYear, (int)($earliest ?: $currentYear)));
         $years = [];
-        for ($year = $currentYear + 1; $year >= $firstYear; $year--) $years[] = $year;
+        for ($year = $currentYear; $year >= $firstYear; $year--) $years[] = $year;
         return $years;
     }
 
@@ -460,6 +539,32 @@ abstract class CuotasConsultas extends CuotasSoporte
         $rows = $db->query('SELECT id_mes, nombre FROM meses ORDER BY id_mes')->fetchAll();
         foreach ($rows as &$row) $row['id_mes'] = (int)$row['id_mes'];
         unset($row);
+        return $rows;
+    }
+
+    protected static function modalidadesCatalogo(PDO $db): array
+    {
+        $fallback = [
+            ['id_modalidad_pago' => null, 'codigo' => 'MENSUAL', 'nombre' => 'CUOTAS MENSUALES', 'mes_desde' => null, 'mes_hasta' => null, 'cantidad_meses' => 1],
+            ['id_modalidad_pago' => null, 'codigo' => 'PRIMERA_MITAD', 'nombre' => 'PRIMERA MITAD', 'mes_desde' => 1, 'mes_hasta' => 6, 'cantidad_meses' => 6],
+            ['id_modalidad_pago' => null, 'codigo' => 'SEGUNDA_MITAD', 'nombre' => 'SEGUNDA MITAD', 'mes_desde' => 7, 'mes_hasta' => 12, 'cantidad_meses' => 6],
+            ['id_modalidad_pago' => null, 'codigo' => 'CONTADO_ANUAL', 'nombre' => 'CONTADO ANUAL', 'mes_desde' => 1, 'mes_hasta' => 12, 'cantidad_meses' => 12],
+            ['id_modalidad_pago' => null, 'codigo' => 'INSCRIPCION', 'nombre' => 'INSCRIPCIÓN', 'mes_desde' => null, 'mes_hasta' => null, 'cantidad_meses' => 0],
+        ];
+
+        try {
+            $map = self::modalitiesMap($db);
+        } catch (Throwable) {
+            $map = [];
+        }
+
+        $rows = [];
+        foreach ($fallback as $default) {
+            $code = $default['codigo'];
+            $row = isset($map[$code]) ? ($map[$code] + $default) : $default;
+            $row['es_paquete'] = self::isPackageModality($code);
+            $rows[] = $row;
+        }
         return $rows;
     }
 
@@ -486,56 +591,240 @@ abstract class CuotasConsultas extends CuotasSoporte
         return $rows;
     }
 
+    /**
+     * Devuelve las columnas reales de una tabla del tenant. Esto permite leer
+     * pagos históricos creados antes de las últimas migraciones sin provocar
+     * un error 500 por una columna opcional todavía ausente.
+     */
+    protected static function columnasTabla(PDO $db, string $table): array
+    {
+        static $cache = [];
+        $allowed = ['pagos', 'pagos_inscripciones', 'modalidades_pago'];
+        if (!in_array($table, $allowed, true)) {
+            throw new InvalidArgumentException('Tabla no permitida para inspección.');
+        }
+
+        $key = spl_object_id($db) . ':' . $table;
+        if (isset($cache[$key])) return $cache[$key];
+
+        try {
+            $statement = $db->prepare(
+                'SELECT COLUMN_NAME
+                 FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
+            );
+            $statement->execute([$table]);
+            $names = $statement->fetchAll(PDO::FETCH_COLUMN);
+            $cache[$key] = array_fill_keys(array_map('strval', $names), true);
+        } catch (Throwable) {
+            // Las columnas básicas pertenecen a la estructura original.
+            // Las opcionales se omiten de la consulta si no se pudieron leer.
+            $cache[$key] = [];
+        }
+        return $cache[$key];
+    }
+
     protected static function paymentRows(PDO $db, ?string $status = null, ?string $code = null, ?int $id = null): array
     {
+        $columns = self::columnasTabla($db, 'pagos');
+        $has = static fn(string $column): bool => isset($columns[$column]);
+
         $where = [];
         $params = [];
-        if ($status !== null) { $where[] = 'p.estado = ?'; $params[] = $status; }
-        if ($code !== null) { $where[] = 'p.codigo_operacion = ?'; $params[] = $code; }
-        if ($id !== null) { $where[] = 'p.id_pago = ?'; $params[] = $id; }
+        if ($status !== null) {
+            $where[] = 'p.estado = ?';
+            $params[] = $status;
+        }
+        if ($code !== null) {
+            if ($has('codigo_operacion')) {
+                $where[] = 'p.codigo_operacion = ?';
+                $params[] = $code;
+            } elseif (preg_match('/^PAGO-(\d+)$/', $code, $match)) {
+                $where[] = 'p.id_pago = ?';
+                $params[] = (int)$match[1];
+            } else {
+                return [];
+            }
+        }
+        if ($id !== null) {
+            $where[] = 'p.id_pago = ?';
+            $params[] = $id;
+        }
         $sqlWhere = $where === [] ? '' : 'WHERE ' . implode(' AND ', $where);
+
+        $operationExpression = $has('codigo_operacion')
+            ? "COALESCE(NULLIF(p.codigo_operacion, ''), CONCAT('PAGO-', p.id_pago))"
+            : "CONCAT('PAGO-', p.id_pago)";
+        $partnerExpression = $has('socio_nombre_snapshot')
+            ? "COALESCE(NULLIF(p.socio_nombre_snapshot, ''), CONCAT(s.apellido, ', ', s.nombre))"
+            : "CONCAT(s.apellido, ', ', s.nombre)";
+        $documentExpression = $has('socio_dni_snapshot')
+            ? "COALESCE(NULLIF(p.socio_dni_snapshot, ''), s.dni)"
+            : 's.dni';
+        $categoryExpression = $has('categoria_nombre_snapshot')
+            ? "COALESCE(NULLIF(p.categoria_nombre_snapshot, ''), c.nombre)"
+            : 'c.nombre';
+        $mediumExpression = $has('medio_pago_nombre_snapshot')
+            ? "COALESCE(NULLIF(p.medio_pago_nombre_snapshot, ''), mp.nombre)"
+            : 'mp.nombre';
+        $modalityIdExpression = $has('id_modalidad_pago')
+            ? 'p.id_modalidad_pago'
+            : 'NULL';
+        $modalityDiscountExpression = $has('porcentaje_descuento_modalidad')
+            ? 'p.porcentaje_descuento_modalidad'
+            : '0';
+        $familyDiscountExpression = $has('porcentaje_descuento_familiar')
+            ? 'p.porcentaje_descuento_familiar'
+            : '0';
+        $baseExpression = $has('monto_base') ? 'p.monto_base' : 'p.monto';
+        $reasonExpression = $has('motivo_condonacion')
+            ? 'p.motivo_condonacion'
+            : 'NULL';
+        $observationsExpression = $has('observaciones')
+            ? 'p.observaciones'
+            : 'NULL';
+
         $statement = $db->prepare(
-            "SELECT 'CUOTA' AS tipo_registro, p.id_pago AS id_linea,
-                    COALESCE(p.codigo_operacion, CONCAT('PAGO-', p.id_pago)) AS codigo_operacion,
-                    p.id_socio, COALESCE(p.socio_nombre_snapshot, CONCAT(s.apellido, ', ', s.nombre)) AS socio,
-                    COALESCE(p.socio_dni_snapshot, s.dni) AS dni,
-                    p.id_categoria, COALESCE(p.categoria_nombre_snapshot, c.nombre) AS categoria, p.anio, p.id_mes, m.nombre AS periodo,
-                    p.monto_base, p.porcentaje_descuento_familiar, p.monto, p.fecha_pago,
-                    p.estado, p.motivo_condonacion, p.observaciones,
-                    COALESCE(p.medio_pago_nombre_snapshot, mp.nombre) AS medio_pago
+            "SELECT 'CUOTA' AS tipo_registro,
+                    p.id_pago AS id_linea,
+                    {$operationExpression} AS codigo_operacion,
+                    p.id_socio,
+                    {$partnerExpression} AS socio,
+                    {$documentExpression} AS dni,
+                    p.id_categoria,
+                    {$categoryExpression} AS categoria,
+                    p.anio,
+                    p.id_mes,
+                    COALESCE(m.nombre, CONCAT('MES ', p.id_mes)) AS periodo,
+                    {$modalityIdExpression} AS id_modalidad_pago,
+                    {$baseExpression} AS monto_base,
+                    {$modalityDiscountExpression} AS porcentaje_descuento_modalidad,
+                    {$familyDiscountExpression} AS porcentaje_descuento_familiar,
+                    p.monto,
+                    p.fecha_pago,
+                    p.estado,
+                    {$reasonExpression} AS motivo_condonacion,
+                    {$observationsExpression} AS observaciones,
+                    {$mediumExpression} AS medio_pago
              FROM pagos p
-             INNER JOIN socios s ON s.id_socio = p.id_socio
-             INNER JOIN categorias c ON c.id_categoria = p.id_categoria
-             INNER JOIN meses m ON m.id_mes = p.id_mes
-             INNER JOIN medios_pago mp ON mp.id_medio_pago = p.id_medio_pago
+             LEFT JOIN socios s ON s.id_socio = p.id_socio
+             LEFT JOIN categorias c ON c.id_categoria = p.id_categoria
+             LEFT JOIN meses m ON m.id_mes = p.id_mes
+             LEFT JOIN medios_pago mp ON mp.id_medio_pago = p.id_medio_pago
              {$sqlWhere}
              ORDER BY p.fecha_pago DESC, p.id_pago DESC"
         );
         $statement->execute($params);
-        return $statement->fetchAll();
+        $rows = $statement->fetchAll();
+
+        $modalitiesById = [];
+        if ($has('id_modalidad_pago')) {
+            try {
+                foreach (self::modalitiesMap($db) as $modality) {
+                    $modalitiesById[(int)$modality['id_modalidad_pago']] = $modality;
+                }
+            } catch (Throwable) {
+                $modalitiesById = [];
+            }
+        }
+
+        foreach ($rows as &$row) {
+            $modalityId = $row['id_modalidad_pago'] === null
+                ? null
+                : (int)$row['id_modalidad_pago'];
+            $modality = $modalityId === null
+                ? null
+                : ($modalitiesById[$modalityId] ?? null);
+            $row['modalidad_codigo'] = $modality['codigo'] ?? 'MENSUAL';
+            $row['modalidad_nombre'] = $modality['nombre'] ?? self::modalityLabel((string)$row['modalidad_codigo']);
+        }
+        unset($row);
+        return $rows;
     }
 
     protected static function registrationRows(PDO $db, ?string $status = null, ?string $code = null, ?int $id = null): array
     {
+        $columns = self::columnasTabla($db, 'pagos_inscripciones');
+        $has = static fn(string $column): bool => isset($columns[$column]);
+
         $where = [];
         $params = [];
-        if ($status !== null) { $where[] = 'pi.estado = ?'; $params[] = $status; }
-        if ($code !== null) { $where[] = 'pi.codigo_operacion = ?'; $params[] = $code; }
-        if ($id !== null) { $where[] = 'pi.id_pago_inscripcion = ?'; $params[] = $id; }
+        if ($status !== null) {
+            $where[] = 'pi.estado = ?';
+            $params[] = $status;
+        }
+        if ($code !== null) {
+            if ($has('codigo_operacion')) {
+                $where[] = 'pi.codigo_operacion = ?';
+                $params[] = $code;
+            } elseif (preg_match('/^INSCRIPCION-(\d+)$/', $code, $match)) {
+                $where[] = 'pi.id_pago_inscripcion = ?';
+                $params[] = (int)$match[1];
+            } else {
+                return [];
+            }
+        }
+        if ($id !== null) {
+            $where[] = 'pi.id_pago_inscripcion = ?';
+            $params[] = $id;
+        }
         $sqlWhere = $where === [] ? '' : 'WHERE ' . implode(' AND ', $where);
+
+        $operationExpression = $has('codigo_operacion')
+            ? "COALESCE(NULLIF(pi.codigo_operacion, ''), CONCAT('INSCRIPCION-', pi.id_pago_inscripcion))"
+            : "CONCAT('INSCRIPCION-', pi.id_pago_inscripcion)";
+        $partnerExpression = $has('socio_nombre_snapshot')
+            ? "COALESCE(NULLIF(pi.socio_nombre_snapshot, ''), CONCAT(s.apellido, ', ', s.nombre))"
+            : "CONCAT(s.apellido, ', ', s.nombre)";
+        $documentExpression = $has('socio_dni_snapshot')
+            ? "COALESCE(NULLIF(pi.socio_dni_snapshot, ''), s.dni)"
+            : 's.dni';
+        $categoryExpression = $has('categoria_nombre_snapshot')
+            ? "COALESCE(NULLIF(pi.categoria_nombre_snapshot, ''), c.nombre)"
+            : 'c.nombre';
+        $mediumExpression = $has('medio_pago_nombre_snapshot')
+            ? "COALESCE(NULLIF(pi.medio_pago_nombre_snapshot, ''), mp.nombre)"
+            : 'mp.nombre';
+        $yearExpression = $has('anio') ? 'pi.anio' : 'YEAR(pi.fecha_pago)';
+        $baseExpression = $has('monto_base') ? 'pi.monto_base' : 'pi.monto';
+        $familyDiscountExpression = $has('porcentaje_descuento_familiar')
+            ? 'pi.porcentaje_descuento_familiar'
+            : '0';
+        $reasonExpression = $has('motivo_condonacion')
+            ? 'pi.motivo_condonacion'
+            : 'NULL';
+        $observationsExpression = $has('observaciones')
+            ? 'pi.observaciones'
+            : 'NULL';
+
         $statement = $db->prepare(
-            "SELECT 'INSCRIPCION' AS tipo_registro, pi.id_pago_inscripcion AS id_linea,
-                    COALESCE(pi.codigo_operacion, CONCAT('INSCRIPCION-', pi.id_pago_inscripcion)) AS codigo_operacion,
-                    pi.id_socio, COALESCE(pi.socio_nombre_snapshot, CONCAT(s.apellido, ', ', s.nombre)) AS socio,
-                    COALESCE(pi.socio_dni_snapshot, s.dni) AS dni,
-                    pi.id_categoria, COALESCE(pi.categoria_nombre_snapshot, c.nombre) AS categoria, pi.anio, NULL AS id_mes, pi.descripcion AS periodo,
-                    pi.monto_base, pi.porcentaje_descuento_familiar, pi.monto, pi.fecha_pago,
-                    pi.estado, pi.motivo_condonacion, pi.observaciones,
-                    COALESCE(pi.medio_pago_nombre_snapshot, mp.nombre) AS medio_pago
+            "SELECT 'INSCRIPCION' AS tipo_registro,
+                    pi.id_pago_inscripcion AS id_linea,
+                    {$operationExpression} AS codigo_operacion,
+                    pi.id_socio,
+                    {$partnerExpression} AS socio,
+                    {$documentExpression} AS dni,
+                    pi.id_categoria,
+                    {$categoryExpression} AS categoria,
+                    {$yearExpression} AS anio,
+                    NULL AS id_mes,
+                    pi.descripcion AS periodo,
+                    NULL AS id_modalidad_pago,
+                    'INSCRIPCION' AS modalidad_codigo,
+                    'INSCRIPCIÓN' AS modalidad_nombre,
+                    {$baseExpression} AS monto_base,
+                    0 AS porcentaje_descuento_modalidad,
+                    {$familyDiscountExpression} AS porcentaje_descuento_familiar,
+                    pi.monto,
+                    pi.fecha_pago,
+                    pi.estado,
+                    {$reasonExpression} AS motivo_condonacion,
+                    {$observationsExpression} AS observaciones,
+                    {$mediumExpression} AS medio_pago
              FROM pagos_inscripciones pi
-             INNER JOIN socios s ON s.id_socio = pi.id_socio
-             INNER JOIN categorias c ON c.id_categoria = pi.id_categoria
-             INNER JOIN medios_pago mp ON mp.id_medio_pago = pi.id_medio_pago
+             LEFT JOIN socios s ON s.id_socio = pi.id_socio
+             LEFT JOIN categorias c ON c.id_categoria = pi.id_categoria
+             LEFT JOIN medios_pago mp ON mp.id_medio_pago = pi.id_medio_pago
              {$sqlWhere}
              ORDER BY pi.fecha_pago DESC, pi.id_pago_inscripcion DESC"
         );
@@ -549,11 +838,12 @@ abstract class CuotasConsultas extends CuotasSoporte
         foreach ($rows as $row) {
             $code = (string)$row['codigo_operacion'];
             $groupKey = $separateByPartner ? $code . '-SOCIO-' . (int)$row['id_socio'] : $code;
+            $modalityCode = self::upper((string)($row['modalidad_codigo'] ?? ($row['tipo_registro'] === 'INSCRIPCION' ? 'INSCRIPCION' : 'MENSUAL')));
+            $modalityName = (string)($row['modalidad_nombre'] ?? self::modalityLabel($modalityCode));
             if (!isset($grouped[$groupKey])) {
                 $grouped[$groupKey] = [
                     'codigo_operacion' => $code,
                     'tipo' => $row['tipo_registro'],
-                    'concepto' => $row['tipo_registro'] === 'INSCRIPCION' ? 'INSCRIPCIÓN' : 'CUOTAS',
                     'estado' => $row['estado'],
                     'fecha_pago' => $row['fecha_pago'],
                     'medio_pago' => $row['medio_pago'],
@@ -562,8 +852,9 @@ abstract class CuotasConsultas extends CuotasSoporte
                     'socios_map' => [],
                     'dni_map' => [],
                     'categorias_map' => [],
-                    'periodos_map' => [],
-                    'descuentos_map' => [],
+                    'modalidades_map' => [],
+                    'descuentos_familia_map' => [],
+                    'descuentos_modalidad_map' => [],
                     'monto_base_num' => 0.0,
                     'monto_num' => 0.0,
                     'lineas' => [],
@@ -572,21 +863,30 @@ abstract class CuotasConsultas extends CuotasSoporte
             $grouped[$groupKey]['socios_map'][(int)$row['id_socio']] = $row['socio'];
             $grouped[$groupKey]['dni_map'][(int)$row['id_socio']] = (string)$row['dni'];
             $grouped[$groupKey]['categorias_map'][(int)$row['id_categoria']] = $row['categoria'];
+            $grouped[$groupKey]['modalidades_map'][$modalityCode] = $modalityName;
+            $grouped[$groupKey]['descuentos_familia_map'][(string)$row['porcentaje_descuento_familiar']] = (float)$row['porcentaje_descuento_familiar'];
+            $grouped[$groupKey]['descuentos_modalidad_map'][(string)($row['porcentaje_descuento_modalidad'] ?? 0)] = (float)($row['porcentaje_descuento_modalidad'] ?? 0);
+            $grouped[$groupKey]['monto_base_num'] += (float)$row['monto_base'];
+            $grouped[$groupKey]['monto_num'] += (float)$row['monto'];
             $periodLabel = $row['tipo_registro'] === 'INSCRIPCION'
                 ? $row['periodo'] . ' (' . $row['anio'] . ')'
                 : $row['periodo'] . ' ' . $row['anio'];
-            $grouped[$groupKey]['periodos_map'][$periodLabel] = $periodLabel;
-            $grouped[$groupKey]['descuentos_map'][(string)$row['porcentaje_descuento_familiar']] = (float)$row['porcentaje_descuento_familiar'];
-            $grouped[$groupKey]['monto_base_num'] += (float)$row['monto_base'];
-            $grouped[$groupKey]['monto_num'] += (float)$row['monto'];
             $grouped[$groupKey]['lineas'][] = [
                 'id_linea' => (int)$row['id_linea'],
                 'tipo' => $row['tipo_registro'],
+                'id_socio' => (int)$row['id_socio'],
+                'id_categoria' => (int)$row['id_categoria'],
+                'anio' => (int)$row['anio'],
+                'id_mes' => $row['id_mes'] === null ? null : (int)$row['id_mes'],
+                'id_modalidad_pago' => $row['id_modalidad_pago'] === null ? null : (int)$row['id_modalidad_pago'],
+                'modalidad_codigo' => $modalityCode,
+                'modalidad' => $modalityName,
                 'socio' => $row['socio'],
                 'dni' => $row['dni'],
                 'categoria' => $row['categoria'],
                 'periodo' => $periodLabel,
                 'monto_base' => (string)$row['monto_base'],
+                'porcentaje_descuento_modalidad' => (string)($row['porcentaje_descuento_modalidad'] ?? '0.00'),
                 'porcentaje_descuento_familiar' => (string)$row['porcentaje_descuento_familiar'],
                 'monto' => (string)$row['monto'],
             ];
@@ -594,20 +894,55 @@ abstract class CuotasConsultas extends CuotasSoporte
 
         $result = [];
         foreach ($grouped as $operation) {
+            usort($operation['lineas'], static function (array $a, array $b): int {
+                return [$a['anio'], $a['id_mes'] ?? 0, $a['id_linea']] <=> [$b['anio'], $b['id_mes'] ?? 0, $b['id_linea']];
+            });
             $partners = array_values($operation['socios_map']);
             $partnerIds = array_keys($operation['socios_map']);
             $partnerDocuments = array_values($operation['dni_map']);
             $categories = array_values($operation['categorias_map']);
-            $periods = array_values($operation['periodos_map']);
-            $discounts = array_values($operation['descuentos_map']);
-            $periodSummary = count($periods) <= 6
-                ? implode(' · ', $periods)
-                : implode(' · ', array_slice($periods, 0, 5)) . ' · +' . (count($periods) - 5);
+            $periods = array_values(array_unique(array_column($operation['lineas'], 'periodo')));
+            $familyDiscounts = array_values($operation['descuentos_familia_map']);
+            $modalityDiscounts = array_values($operation['descuentos_modalidad_map']);
+            $modalityCodes = array_keys($operation['modalidades_map']);
+            $modalityNames = array_values($operation['modalidades_map']);
+            $modalityCode = count($modalityCodes) === 1 ? $modalityCodes[0] : 'VARIAS';
+            $modalityLabel = count($modalityNames) === 1 ? $modalityNames[0] : 'VARIAS MODALIDADES';
+            $isPackage = count($modalityCodes) === 1 && self::isPackageModality($modalityCode);
+            $years = array_values(array_unique(array_column($operation['lineas'], 'anio')));
+
+            if ($isPackage && count($years) === 1) {
+                $periodSummary = match ($modalityCode) {
+                    'PRIMERA_MITAD' => 'ENERO A JUNIO ' . $years[0],
+                    'SEGUNDA_MITAD' => 'JULIO A DICIEMBRE ' . $years[0],
+                    'CONTADO_ANUAL' => 'ENERO A DICIEMBRE ' . $years[0],
+                    default => implode(' · ', $periods),
+                };
+            } else {
+                $periodSummary = count($periods) <= 6
+                    ? implode(' · ', $periods)
+                    : implode(' · ', array_slice($periods, 0, 5)) . ' · +' . (count($periods) - 5);
+            }
+
+            $familyDiscountLabel = count($familyDiscounts) === 1
+                ? number_format($familyDiscounts[0], 2, ',', '') . '%'
+                : 'VARIOS';
+            $modalityDiscountLabel = count($modalityDiscounts) === 1 && $modalityDiscounts[0] > 0
+                ? number_format($modalityDiscounts[0], 2, ',', '') . '% MOD.'
+                : null;
+            $discountLabel = $modalityDiscountLabel === null
+                ? $familyDiscountLabel
+                : $modalityDiscountLabel . ' · ' . $familyDiscountLabel . ' FAM.';
+
             $result[] = [
                 'fila_id' => $operation['codigo_operacion'] . '-SOCIO-' . implode('-', $partnerIds),
                 'codigo_operacion' => $operation['codigo_operacion'],
                 'tipo' => $operation['tipo'],
-                'concepto' => $operation['concepto'],
+                'concepto' => $modalityLabel,
+                'modalidad_codigo' => $modalityCode,
+                'modalidad_label' => $modalityLabel,
+                'es_paquete' => $isPackage,
+                'eliminacion_atomica' => $isPackage,
                 'estado' => $operation['estado'],
                 'fecha_pago' => $operation['fecha_pago'],
                 'medio_pago' => $operation['medio_pago'],
@@ -622,14 +957,16 @@ abstract class CuotasConsultas extends CuotasSoporte
                 'periodos' => $periods,
                 'periodos_label' => $periodSummary,
                 'cantidad_lineas' => count($operation['lineas']),
-                'porcentaje_descuento' => count($discounts) === 1 ? number_format($discounts[0], 2, '.', '') : null,
-                'descuento_label' => count($discounts) === 1 ? number_format($discounts[0], 2, ',', '') . '%' : 'VARIOS',
+                'porcentaje_descuento' => count($familyDiscounts) === 1 ? number_format($familyDiscounts[0], 2, '.', '') : null,
+                'descuento_label' => $discountLabel,
                 'monto_base' => number_format($operation['monto_base_num'], 2, '.', ''),
                 'monto' => number_format($operation['monto_num'], 2, '.', ''),
                 'motivo_condonacion' => $operation['motivo_condonacion'],
                 'observaciones' => $operation['observaciones'],
                 'lineas' => $operation['lineas'],
-                'busqueda' => implode(' ', [$operation['codigo_operacion'], implode(' ', $partners), implode(' ', $partnerDocuments), implode(' ', $categories), implode(' ', $periods)]),
+                // El código se conserva únicamente para enlazar comprobantes,
+                // anulaciones y auditoría. No es necesario mostrarlo al usuario.
+                'busqueda' => implode(' ', [$operation['codigo_operacion'], $modalityLabel, implode(' ', $partners), implode(' ', $partnerDocuments), implode(' ', $categories), implode(' ', $periods)]),
             ];
         }
         return $result;

@@ -85,6 +85,7 @@ function FamilyForm({ form, setForm, partners }) {
           {visible.map((partner) => {
             const belongsElsewhere =
               partner.id_familia &&
+              partner.familia_activa !== false &&
               partner.id_familia !== Number(form.id_familia || 0);
             const selected = form.integrante_ids.includes(partner.id_socio);
             const inactive = partner.activo === false;
@@ -361,8 +362,8 @@ export default function Familias() {
       >
         <p className="entity-confirm-text">
           {stateModal?.activo
-            ? "La familia dejará de estar disponible para nuevas operaciones, pero conservará sus integrantes y pagos históricos."
-            : "La familia volverá a estar disponible para nuevas operaciones."}
+            ? "La familia quedará inactiva. Sus integrantes podrán asignarse a otra familia; mientras no sean reasignados, se conservarán para una posible reactivación. Los pagos históricos no se modifican."
+            : "La familia volverá a estar disponible con los integrantes que no hayan sido reasignados."}
         </p>
       </CrudModal>
     </>

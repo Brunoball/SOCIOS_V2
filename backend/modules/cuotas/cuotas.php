@@ -21,19 +21,7 @@ final class Cuotas extends CuotasRegistros
     {
         $auth = auth_context();
         $id = positive_id($_GET['id'] ?? null, 'socio');
-        $currentYear = (int)date('Y');
-        $untilYearText = trim((string)($_GET['hasta_anio'] ?? ''));
-        $untilYear = $currentYear;
-        if ($untilYearText !== '') {
-            $validatedYear = filter_var($untilYearText, FILTER_VALIDATE_INT, [
-                'options' => ['min_range' => $currentYear, 'max_range' => $currentYear + 1],
-            ]);
-            if ($validatedYear === false) {
-                api_error('Solo se puede habilitar el año actual o el año siguiente.', 'ANIO_NO_HABILITABLE');
-            }
-            $untilYear = (int)$validatedYear;
-        }
-        api_success(self::detalleSocioDatos($auth['db'], $id, $untilYear));
+        api_success(self::detalleSocioDatos($auth['db'], $id));
     }
 
     public static function registrarPago(): never
@@ -41,8 +29,8 @@ final class Cuotas extends CuotasRegistros
         $auth = require_admin();
         $result = self::registrarPagoDatos($auth, request_body());
         api_success($result, $result['estado'] === 'CONDONADO'
-            ? 'Cuotas condonadas correctamente.'
-            : 'Pago de cuotas registrado correctamente.');
+            ? 'Condonación registrada correctamente.'
+            : 'Pago registrado correctamente.');
     }
 
     public static function registrarInscripcion(): never
@@ -50,7 +38,7 @@ final class Cuotas extends CuotasRegistros
         $auth = require_admin();
         $result = self::registrarInscripcionDatos($auth, request_body());
         api_success($result, $result['estado'] === 'CONDONADO'
-            ? 'Inscripción condonada correctamente.'
+            ? 'Condonación de inscripción registrada correctamente.'
             : 'Pago de inscripción registrado correctamente.');
     }
 
@@ -58,7 +46,7 @@ final class Cuotas extends CuotasRegistros
     {
         $auth = require_admin();
         $result = self::anularDatos($auth, request_body());
-        api_success($result, 'El registro fue eliminado y volvió a quedar pendiente.');
+        api_success($result, 'Registro eliminado correctamente. Los períodos volvieron a quedar pendientes.');
     }
 
     public static function comprobante(): never
