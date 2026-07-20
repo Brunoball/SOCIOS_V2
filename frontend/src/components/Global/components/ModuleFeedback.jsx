@@ -7,16 +7,22 @@ const TOAST_DURATION = {
   warning: 4200,
 };
 
-export default function ModuleFeedback({ type = "success", message, onClose }) {
+export default function ModuleFeedback({
+  type = "success",
+  message,
+  duration,
+  onClose,
+}) {
   if (!message) return null;
 
   const toastType = type === "success" ? "exito" : type;
 
   return (
     <Toast
+      key={`${toastType}-${message}`}
       tipo={toastType}
       mensaje={message}
-      duracion={TOAST_DURATION[type] || 3200}
+      duracion={duration ?? TOAST_DURATION[type] ?? 3200}
       onClose={onClose}
     />
   );

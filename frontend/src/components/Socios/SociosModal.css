@@ -1,22 +1,289 @@
 /* =========================================================
-   Socios — estilos propios de sus modales.
-   La base visual vive en Global/styles/Global_Modals.css.
+   Socios — estilos propios del alta y edición.
+   La estructura compartida permanece en Global_Modals.css.
    ========================================================= */
 
 .socios-modal--form.entity-modal {
-  width: min(920px, 100%);
+  width: min(880px, 100%);
 }
 
-.socios-modal--state.entity-modal {
-  width: min(520px, 100%);
+.socios-modal--form .entity-modal__body {
+  padding: 14px 20px 18px;
+  background: linear-gradient(180deg, #fff 0%, #fdfbf7 100%);
+}
+
+.socios-modal--form .entity-modal__footer {
+  padding-top: 12px;
+}
+
+.socios-modal__form {
+  gap: 0;
+}
+
+/* Pestañas minimalistas inspiradas en el modal de Docentes. */
+.socios-modal-tabs {
+  min-height: 45px;
+  display: flex;
+  align-items: flex-end;
+  gap: 24px;
+  margin: 0 2px;
+  border-bottom: 1px solid rgba(58, 46, 43, 0.13);
+}
+
+.socios-modal-tab {
+  position: relative;
+  min-height: 45px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 3px;
+  border: 0;
+  color: color-mix(in srgb, var(--entity-modal-text) 88%, #000);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: color var(--entity-modal-transition);
+}
+
+.socios-modal-tab::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  border-radius: 999px 999px 0 0;
+  background: transparent;
+  transform: scaleX(0.55);
+  transition:
+    background var(--entity-modal-transition),
+    transform var(--entity-modal-transition);
+}
+
+.socios-modal-tab:hover,
+.socios-modal-tab.is-active {
+  color: var(--entity-modal-action);
+}
+
+.socios-modal-tab.is-active::after {
+  background: var(--entity-modal-action);
+  transform: scaleX(1);
+}
+
+.socios-modal-tab > svg {
+  width: 15px;
+  min-width: 15px;
+}
+
+.socios-modal-tab__badge {
+  min-width: 19px;
+  height: 19px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--entity-modal-action);
+  background: rgba(196, 139, 59, 0.11);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+/* Cada pestaña se presenta como una tarjeta compacta. */
+.socios-form-panel {
+  margin-top: 13px;
+  overflow: hidden;
+  border: 1px solid rgba(58, 46, 43, 0.1);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: 0 12px 30px -27px rgba(58, 46, 43, 0.5);
+  animation: sociosPanelIn 0.16s ease-out;
+}
+
+@keyframes sociosPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.socios-form-panel__header {
+  min-height: 51px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 15px;
+  border-bottom: 1px solid rgba(58, 46, 43, 0.09);
+  background: rgba(253, 251, 247, 0.72);
+}
+
+.socios-form-panel__header > div {
+  min-width: 0;
+}
+
+.socios-form-panel__header > div > span {
+  display: block;
+  margin-bottom: 3px;
+  color: color-mix(in srgb, var(--entity-modal-action) 78%, #000);
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.085em;
+  text-transform: uppercase;
+}
+
+.socios-form-panel__header h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--entity-modal-ink);
+  font-size: 13.5px;
+  font-weight: 680;
+  letter-spacing: -0.015em;
+}
+
+.socios-form-panel__header h3 svg {
+  color: var(--entity-modal-action);
+  font-size: 13px;
+}
+
+.socios-form-panel__header small {
+  padding: 4px 9px;
+  border: 1px solid rgba(196, 139, 59, 0.15);
+  border-radius: 999px;
+  color: var(--entity-modal-action);
+  background: rgba(196, 139, 59, 0.07);
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.socios-form-panel__body {
+  padding: 16px;
+}
+
+.socios-form-panel__body--membership {
+  display: grid;
+  gap: 14px;
+}
+
+.socios-form-panel__hint {
+  margin: 0 16px 14px;
+  padding: 9px 11px;
+  border-left: 3px solid rgba(196, 139, 59, 0.48);
+  border-radius: 0 9px 9px 0;
+  color: var(--entity-modal-text);
+  background: rgba(196, 139, 59, 0.055);
+  font-size: 11.5px;
+  line-height: 1.42;
+}
+
+/* Floating labels locales: centradas vacías y sobre el borde al activarse. */
+.socios-floating-field {
+  position: relative;
+  gap: 0;
+}
+
+.socios-floating-field > input,
+.socios-floating-field > select,
+.socios-floating-field > textarea {
+  min-height: 47px;
+  padding: 16px 12px 6px;
+  border-color: rgba(58, 46, 43, 0.13);
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(58, 46, 43, 0.025);
+}
+
+.socios-floating-field > textarea {
+  min-height: 72px;
+  padding-top: 18px;
+}
+
+.socios-floating-field > span {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  z-index: 1;
+  max-width: calc(100% - 24px);
+  padding: 0;
+  overflow: hidden;
+  transform: translateY(-50%);
+  color: color-mix(in srgb, var(--entity-modal-text) 86%, #000);
+  background: transparent;
+  font-size: 11.5px;
+  font-weight: 620;
+  letter-spacing: 0;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+  pointer-events: none;
+  transition:
+    top var(--entity-modal-transition),
+    color var(--entity-modal-transition),
+    font-size var(--entity-modal-transition),
+    padding var(--entity-modal-transition),
+    background var(--entity-modal-transition);
+}
+
+.socios-floating-field.is-textarea > span {
+  top: 23px;
+}
+
+.socios-floating-field.is-active > span,
+.socios-floating-field:focus-within > span {
+  top: 0;
+  left: 10px;
+  padding: 0 5px;
+  transform: translateY(-50%);
+  color: var(--entity-modal-action);
+  background: #fff;
+  font-size: 9.5px;
+  font-weight: 750;
+}
+
+.socios-floating-field > input:focus,
+.socios-floating-field > select:focus,
+.socios-floating-field > textarea:focus {
+  border-color: rgba(196, 139, 59, 0.4);
+  box-shadow:
+    0 0 0 4px rgba(196, 139, 59, 0.1),
+    0 8px 18px -18px rgba(58, 46, 43, 0.5);
 }
 
 .socios-modal__categories {
   align-items: flex-start;
+  padding: 12px;
+  border-color: rgba(58, 46, 43, 0.1);
+  background: rgba(253, 251, 247, 0.66);
+}
+
+.socios-modal__categories legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--entity-modal-ink);
+  font-size: 10.5px;
+}
+
+.socios-modal__categories legend svg {
+  color: var(--entity-modal-action);
 }
 
 .socios-modal__categories > label {
   max-width: 100%;
+  min-height: 34px;
+  border-radius: 999px;
+  box-shadow: 0 3px 12px -11px rgba(58, 46, 43, 0.55);
 }
 
 .socios-modal__categories > label span {
@@ -26,7 +293,59 @@
 }
 
 @media (max-width: 720px) {
+  .socios-modal--form .entity-modal__body {
+    padding: 10px 13px 14px;
+  }
+
+  .socios-modal-tabs {
+    gap: 18px;
+    overflow-x: auto;
+  }
+
+  .socios-modal-tab {
+    min-width: max-content;
+    font-size: 12.5px;
+  }
+
+  .socios-form-panel__body {
+    padding: 13px;
+  }
+
+  .socios-form-panel__body .entity-form__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .socios-form-panel__body .entity-field--wide {
+    grid-column: auto;
+  }
+
+  .socios-form-panel__header small {
+    display: none;
+  }
+
   .socios-modal__categories > label {
     width: 100%;
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .socios-modal-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding-bottom: 6px;
+  }
+
+  .socios-modal-tab {
+    min-width: 0;
+    padding: 0 4px;
+    font-size: 11.5px;
+  }
+
+  .socios-modal-tab span:not(.socios-modal-tab__badge) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }

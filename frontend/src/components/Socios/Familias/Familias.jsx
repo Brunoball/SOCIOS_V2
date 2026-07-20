@@ -7,6 +7,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../../Global/components/ModulePage";
 import CrudModal from "../../Global/components/CrudModal";
+import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../../Global/components/ModuleFeedback";
 import { canWrite } from "../../Global/auth/session";
 import { familiasApi } from "../api/familiasApi";
@@ -191,22 +192,13 @@ export default function Familias() {
       setSaving(false);
     }
   };
-  const changeState = async (event) => {
-    event.preventDefault();
+  const changeState = async () => {
     if (!stateModal) return;
-    setSaving(true);
-    try {
-      const response = stateModal.activo
-        ? await familiasApi.darBaja(stateModal.id_familia)
-        : await familiasApi.reactivar(stateModal.id_familia);
-      setStateModal(null);
-      setFeedback({ type: "success", message: response.mensaje });
-      await cargar();
-    } catch (err) {
-      setFeedback({ type: "error", message: err.message });
-    } finally {
-      setSaving(false);
-    }
+    const response = stateModal.activo
+      ? await familiasApi.darBaja(stateModal.id_familia)
+      : await familiasApi.reactivar(stateModal.id_familia);
+    await cargar();
+    return response;
   };
   return (
     <>
@@ -226,6 +218,7 @@ export default function Familias() {
         <ModuleFeedback
           type={feedback?.type || "error"}
           message={feedback?.message || error}
+          duration={feedback?.duration}
           onClose={() => setFeedback(null)}
         />
         <div
@@ -347,25 +340,60 @@ export default function Familias() {
           partners={catalogos.socios || []}
         />
       </CrudModal>
-      <CrudModal
+      <ModalEliminarGlobal
         open={Boolean(stateModal)}
+        operacion={stateModal?.activo ? "baja" : "alta"}
+        row={stateModal}
         title={
           stateModal?.activo ? "Dar de baja la familia" : "Reactivar familia"
         }
-        subtitle={stateModal?.nombre || ""}
+        message={
+          stateModal?.activo
+            ? "La familia quedará inactiva. Los pagos históricos no se modificarán."
+            : "La familia volverá a estar disponible con los integrantes que no hayan sido reasignados."
+        }
+        warning={
+          stateModal?.activo
+            ? "Sus integrantes podrán asignarse a otra familia."
+            : ""
+        }
+        details={
+          stateModal
+            ? [
+                { label: "Familia", value: stateModal.nombre },
+                {
+                  label: "Integrantes",
+                  value: stateModal.cantidad_integrantes,
+                },
+                {
+                  label: "Estado actual",
+                  value: stateModal.activo ? "ACTIVA" : "BAJA",
+                },
+              ]
+            : []
+        }
         onClose={() => setStateModal(null)}
-        onSubmit={changeState}
-        saving={saving}
-        submitLabel={stateModal?.activo ? "Confirmar baja" : "Reactivar"}
-        danger={Boolean(stateModal?.activo)}
-        modalClassName="familias-modal familias-modal--state"
-      >
-        <p className="entity-confirm-text">
-          {stateModal?.activo
-            ? "La familia quedará inactiva. Sus integrantes podrán asignarse a otra familia; mientras no sean reasignados, se conservarán para una posible reactivación. Los pagos históricos no se modifican."
-            : "La familia volverá a estar disponible con los integrantes que no hayan sido reasignados."}
-        </p>
-      </CrudModal>
+        onConfirm={changeState}
+        onToast={(type, message, duration) =>
+          setFeedback({ type, message, duration })
+        }
+        confirmLabel={stateModal?.activo ? "Dar de baja" : "Reactivar"}
+        loadingMessage={
+          stateModal?.activo
+            ? "Dando de baja la familia…"
+            : "Reactivando la familia…"
+        }
+        successMessage={
+          stateModal?.activo
+            ? "Familia dada de baja correctamente."
+            : "Familia reactivada correctamente."
+        }
+        errorMessage={
+          stateModal?.activo
+            ? "No se pudo dar de baja la familia."
+            : "No se pudo reactivar la familia."
+        }
+      />
     </>
   );
 }

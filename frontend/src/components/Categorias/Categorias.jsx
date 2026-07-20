@@ -9,6 +9,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../Global/components/ModulePage";
 import CrudModal from "../Global/components/CrudModal";
+import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../Global/components/ModuleFeedback";
 import { canWrite } from "../Global/auth/session";
 import { categoriasApi } from "./api/categoriasApi";
@@ -258,40 +259,22 @@ export default function Categorias() {
     }
   };
 
-  const changeCategoryState = async (event) => {
-    event.preventDefault();
+  const changeCategoryState = async () => {
     if (!stateModal) return;
-    setSaving(true);
-    try {
-      const response = stateModal.activo
-        ? await categoriasApi.darBaja(stateModal.id_categoria)
-        : await categoriasApi.reactivar(stateModal.id_categoria);
-      setStateModal(null);
-      setFeedback({ type: "success", message: response.mensaje });
-      await cargar();
-    } catch (err) {
-      setFeedback({ type: "error", message: err.message });
-    } finally {
-      setSaving(false);
-    }
+    const response = stateModal.activo
+      ? await categoriasApi.darBaja(stateModal.id_categoria)
+      : await categoriasApi.reactivar(stateModal.id_categoria);
+    await cargar();
+    return response;
   };
 
-  const deleteDiscount = async (event) => {
-    event.preventDefault();
+  const deleteDiscount = async () => {
     if (!deleteDiscountModal) return;
-    setSaving(true);
-    try {
-      const response = await categoriasApi.eliminarDescuentoFamiliar(
-        deleteDiscountModal.id_descuento_familiar,
-      );
-      setDeleteDiscountModal(null);
-      setFeedback({ type: "success", message: response.mensaje });
-      await cargarDescuentos();
-    } catch (err) {
-      setFeedback({ type: "error", message: err.message });
-    } finally {
-      setSaving(false);
-    }
+    const response = await categoriasApi.eliminarDescuentoFamiliar(
+      deleteDiscountModal.id_descuento_familiar,
+    );
+    await cargarDescuentos();
+    return response;
   };
 
   const openHistory = async (item) => {
@@ -375,6 +358,7 @@ export default function Categorias() {
         <ModuleFeedback
           type={feedback?.type || "error"}
           message={feedback?.message || activeError}
+          duration={feedback?.duration}
           onClose={() => setFeedback(null)}
         />
 
@@ -632,46 +616,95 @@ export default function Categorias() {
         <DiscountForm form={discountForm} setForm={setDiscountForm} />
       </CrudModal>
 
-      <CrudModal
+      <ModalEliminarGlobal
         open={Boolean(stateModal)}
+        operacion={stateModal?.activo ? "baja" : "alta"}
+        row={stateModal}
         title={
           stateModal?.activo
             ? "Dar de baja la categoría"
             : "Reactivar categoría"
         }
-        subtitle={stateModal?.nombre || ""}
-        onClose={() => setStateModal(null)}
-        onSubmit={changeCategoryState}
-        saving={saving}
-        submitLabel={stateModal?.activo ? "Confirmar baja" : "Reactivar"}
-        danger={Boolean(stateModal?.activo)}
-      >
-        <p className="entity-confirm-text">
-          {stateModal?.activo
-            ? "La categoría no podrá asignarse ni cobrarse en nuevas operaciones. Se conservarán socios, precios y pagos históricos."
-            : "La categoría volverá a estar disponible para asignaciones y cobros."}
-        </p>
-      </CrudModal>
-
-      <CrudModal
-        open={Boolean(deleteDiscountModal)}
-        title="Eliminar descuento familiar"
-        subtitle={
-          deleteDiscountModal
-            ? `DESDE ${deleteDiscountModal.cantidad_integrantes} INTEGRANTES · ${percentage(deleteDiscountModal.porcentaje_descuento)}`
+        message={
+          stateModal?.activo
+            ? "La categoría no podrá asignarse ni cobrarse en nuevas operaciones."
+            : "La categoría volverá a estar disponible para asignaciones y cobros."
+        }
+        warning={
+          stateModal?.activo
+            ? "Se conservarán los socios, precios y pagos históricos."
             : ""
         }
+        details={
+          stateModal
+            ? [
+                { label: "Categoría", value: stateModal.nombre },
+                {
+                  label: "Monto mensual",
+                  value: money(stateModal.monto_actual),
+                },
+                { label: "Socios", value: stateModal.cantidad_socios },
+                {
+                  label: "Estado actual",
+                  value: stateModal.activo ? "ACTIVA" : "BAJA",
+                },
+              ]
+            : []
+        }
+        onClose={() => setStateModal(null)}
+        onConfirm={changeCategoryState}
+        onToast={(type, message, duration) =>
+          setFeedback({ type, message, duration })
+        }
+        confirmLabel={stateModal?.activo ? "Dar de baja" : "Reactivar"}
+        loadingMessage={
+          stateModal?.activo
+            ? "Dando de baja la categoría…"
+            : "Reactivando la categoría…"
+        }
+        successMessage={
+          stateModal?.activo
+            ? "Categoría dada de baja correctamente."
+            : "Categoría reactivada correctamente."
+        }
+        errorMessage={
+          stateModal?.activo
+            ? "No se pudo dar de baja la categoría."
+            : "No se pudo reactivar la categoría."
+        }
+      />
+
+      <ModalEliminarGlobal
+        open={Boolean(deleteDiscountModal)}
+        operacion="eliminar"
+        row={deleteDiscountModal}
+        title="Eliminar descuento familiar"
+        message="La regla dejará de aplicarse en los próximos cálculos."
+        warning="Los pagos históricos conservarán el porcentaje utilizado en su momento."
+        details={
+          deleteDiscountModal
+            ? [
+                {
+                  label: "Desde",
+                  value: `${deleteDiscountModal.cantidad_integrantes} INTEGRANTES`,
+                },
+                {
+                  label: "Descuento",
+                  value: percentage(deleteDiscountModal.porcentaje_descuento),
+                },
+              ]
+            : []
+        }
         onClose={() => setDeleteDiscountModal(null)}
-        onSubmit={deleteDiscount}
-        saving={saving}
-        submitLabel="Eliminar regla"
-        danger
-      >
-        <p className="entity-confirm-text">
-          La regla dejará de aplicarse en los próximos cálculos. Los pagos
-          históricos conservarán el porcentaje usado en su momento.
-        </p>
-      </CrudModal>
+        onConfirm={deleteDiscount}
+        onToast={(type, message, duration) =>
+          setFeedback({ type, message, duration })
+        }
+        confirmLabel="Eliminar regla"
+        loadingMessage="Eliminando la regla de descuento…"
+        successMessage="Descuento familiar eliminado correctamente."
+        errorMessage="No se pudo eliminar el descuento familiar."
+      />
 
       <CrudModal
         open={Boolean(historyModal)}
