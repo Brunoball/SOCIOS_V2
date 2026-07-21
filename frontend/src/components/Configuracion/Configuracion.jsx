@@ -1,20 +1,22 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faArrowLeft,
   faArrowRotateLeft,
   faArrowTrendDown,
   faArrowTrendUp,
   faCashRegister,
+  faChevronRight,
   faGear,
   faLocationDot,
   faMoneyBillTransfer,
   faPen,
-  faPlus,
   faTags,
   faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../Global/components/ModulePage";
 import CrudModal from "../Global/components/CrudModal";
+import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../Global/components/ModuleFeedback";
 import { canWrite } from "../Global/auth/session";
 import { configuracionApi } from "./api/configuracionApi";
@@ -27,13 +29,19 @@ const money = (value) => new Intl.NumberFormat("es-AR", {
   currency: "ARS",
 }).format(Number(value || 0));
 
+const AMOUNT_SECTION = "monto_inscripcion";
+
 const LIST_META = {
   medios_pago: {
     label: "medio de pago",
     title: "Medios de pago",
-    description: "Opciones disponibles al cobrar cuotas, inscripciones y movimientos contables.",
+    description: "Administrá las opciones disponibles al cobrar cuotas, inscripciones y movimientos contables.",
     icon: faMoneyBillTransfer,
+    area: "Cobros",
+    detail: "Cuotas, ingresos y egresos",
     summaryKey: "medios_pago_activos",
+    activeSingular: "activo",
+    activePlural: "activos",
     empty: "Todavía no hay medios de pago configurados.",
     subtitle: "El medio quedará disponible en Cuotas, Ingresos y Egresos.",
     maxLength: 100,
@@ -41,9 +49,13 @@ const LIST_META = {
   localidades: {
     label: "localidad",
     title: "Localidades",
-    description: "Localidades disponibles para el domicilio de los socios.",
+    description: "Organizá las localidades que se pueden seleccionar en el domicilio de cada socio.",
     icon: faLocationDot,
+    area: "Socios",
+    detail: "Domicilios y códigos postales",
     summaryKey: "localidades_activos",
+    activeSingular: "activa",
+    activePlural: "activas",
     empty: "Todavía no hay localidades configuradas.",
     subtitle: "La localidad quedará disponible en Socios.",
     maxLength: 120,
@@ -51,9 +63,13 @@ const LIST_META = {
   contable_proveedores: {
     label: "persona o proveedor",
     title: "Personas y proveedores",
-    description: "Lista compartida por los formularios de otros ingresos y egresos.",
+    description: "Gestioná la lista compartida por los formularios de otros ingresos y egresos.",
     icon: faCashRegister,
+    area: "Contable",
+    detail: "Personas y proveedores frecuentes",
     summaryKey: "contable_proveedores_activos",
+    activeSingular: "activo",
+    activePlural: "activos",
     empty: "Todavía no hay personas o proveedores contables.",
     subtitle: "La opción quedará disponible en Ingresos y Egresos.",
     maxLength: 160,
@@ -61,9 +77,13 @@ const LIST_META = {
   contable_categorias_ingreso: {
     label: "categoría de ingreso",
     title: "Categorías de ingresos",
-    description: "Clasificación de los ingresos manuales ajenos a cuotas e inscripciones.",
+    description: "Definí las categorías utilizadas para ordenar y resumir los ingresos manuales.",
     icon: faArrowTrendUp,
+    area: "Ingresos",
+    detail: "Clasificación principal",
     summaryKey: "contable_categorias_ingreso_activos",
+    activeSingular: "activa",
+    activePlural: "activas",
     empty: "Todavía no hay categorías de ingresos.",
     subtitle: "La categoría quedará disponible al registrar otros ingresos.",
     maxLength: 160,
@@ -71,9 +91,13 @@ const LIST_META = {
   contable_conceptos_ingreso: {
     label: "descripción de ingreso",
     title: "Descripciones de ingresos",
-    description: "Conceptos o imputaciones reutilizables para identificar cada ingreso manual.",
+    description: "Creá conceptos reutilizables para identificar con rapidez cada ingreso manual.",
     icon: faTags,
+    area: "Ingresos",
+    detail: "Conceptos e imputaciones",
     summaryKey: "contable_conceptos_ingreso_activos",
+    activeSingular: "activa",
+    activePlural: "activas",
     empty: "Todavía no hay descripciones de ingresos.",
     subtitle: "La descripción quedará disponible al registrar otros ingresos.",
     maxLength: 160,
@@ -81,9 +105,13 @@ const LIST_META = {
   contable_categorias_egreso: {
     label: "categoría de egreso",
     title: "Categorías de egresos",
-    description: "Clasificación principal para ordenar y resumir los gastos.",
+    description: "Definí las categorías principales utilizadas para ordenar y resumir los gastos.",
     icon: faArrowTrendDown,
+    area: "Egresos",
+    detail: "Clasificación principal",
     summaryKey: "contable_categorias_egreso_activos",
+    activeSingular: "activa",
+    activePlural: "activas",
     empty: "Todavía no hay categorías de egresos.",
     subtitle: "La categoría quedará disponible al registrar egresos.",
     maxLength: 160,
@@ -91,24 +119,56 @@ const LIST_META = {
   contable_conceptos_egreso: {
     label: "descripción de egreso",
     title: "Descripciones de egresos",
-    description: "Conceptos reutilizables para detallar la imputación de cada gasto.",
+    description: "Creá conceptos reutilizables para detallar la imputación de cada gasto.",
     icon: faTags,
+    area: "Egresos",
+    detail: "Conceptos e imputaciones",
     summaryKey: "contable_conceptos_egreso_activos",
+    activeSingular: "activa",
+    activePlural: "activas",
     empty: "Todavía no hay descripciones de egresos.",
     subtitle: "La descripción quedará disponible al registrar egresos.",
     maxLength: 160,
   },
 };
 
-const CONFIG_LIST_ORDER = [
-  "medios_pago",
-  "localidades",
-  "contable_proveedores",
-  "contable_categorias_ingreso",
-  "contable_conceptos_ingreso",
-  "contable_categorias_egreso",
-  "contable_conceptos_egreso",
-];
+const CONFIG_GROUPS = {
+  cuotas: {
+    title: "Cuotas y cobros",
+    description: "Configurá el importe de inscripción y los medios disponibles para registrar cobros.",
+    icon: faMoneyBillTransfer,
+    area: "Cuotas",
+    detail: "Inscripción y medios de pago",
+    sections: [
+      { value: AMOUNT_SECTION, label: "Monto de inscripción" },
+      { value: "medios_pago", label: "Medios de pago" },
+    ],
+  },
+  socios: {
+    title: "Socios",
+    description: "Administrá las localidades y códigos postales utilizados en los domicilios.",
+    icon: faLocationDot,
+    area: "Socios",
+    detail: "Localidades y códigos postales",
+    sections: [
+      { value: "localidades", label: "Localidades" },
+    ],
+  },
+  contable: {
+    title: "Configuración contable",
+    description: "Centralizá proveedores, categorías y descripciones de ingresos y egresos.",
+    icon: faCashRegister,
+    area: "Contable",
+    detail: "Proveedores, ingresos y egresos",
+    sections: [
+      { value: "contable_proveedores", label: "Proveedores" },
+      { value: "contable_categorias_ingreso", label: "Categorías de ingresos" },
+      { value: "contable_conceptos_ingreso", label: "Descripciones de ingresos" },
+      { value: "contable_categorias_egreso", label: "Categorías de egresos" },
+      { value: "contable_conceptos_egreso", label: "Descripciones de egresos" },
+    ],
+  },
+};
 
 const itemId = (item) => item.id_medio_pago || item.id_localidad || item.id_opcion;
 
@@ -119,21 +179,33 @@ const emptyListForm = (lista = "medios_pago") => ({
   codigo_postal: "",
 });
 
-function SettingsCard({ icon, title, description, badge, children, action }) {
+function ConfigAccessCard({ icon, title, description, status, area, detail, onClick }) {
   return (
-    <article className="config-card">
-      <header className="config-card__header">
-        <span className="config-card__icon"><FontAwesomeIcon icon={icon} /></span>
-        <div className="config-card__heading">
-          <div className="config-card__titleRow">
-            <h2>{title}</h2>
-            {badge ? <span className="config-card__badge">{badge}</span> : null}
+    <article className="config-accessCardWrap">
+      <button type="button" className="config-accessCard" onClick={onClick}>
+        <div className="config-accessCard__main">
+          <span className="config-accessCard__icon" aria-hidden="true">
+            <FontAwesomeIcon icon={icon} />
+          </span>
+          <div className="config-accessCard__body">
+            <div className="config-accessCard__titleRow">
+              <h2>{title}</h2>
+              <span className="config-accessCard__status">{status}</span>
+            </div>
+            <p>{description}</p>
           </div>
-          <p>{description}</p>
         </div>
-        {action}
-      </header>
-      <div className="config-card__body">{children}</div>
+
+        <footer className="config-accessCard__footer">
+          <div className="config-accessCard__meta">
+            <span><small>ÁREA</small>{area}</span>
+            <span><small>DETALLE</small>{detail}</span>
+          </div>
+          <span className="config-accessCard__arrow" aria-hidden="true">
+            <FontAwesomeIcon icon={faChevronRight} />
+          </span>
+        </footer>
+      </button>
     </article>
   );
 }
@@ -194,7 +266,9 @@ function ConfigList({ items, listKey, emptyText, writable, onEdit, onState }) {
 
 export default function Configuracion() {
   const writable = canWrite();
-  const { parametros, listas, resumen, loading, error, cargar } = useConfiguracion();
+  const { parametros, listas, resumen, error, cargar } = useConfiguracion();
+  const [activeGroup, setActiveGroup] = useState(null);
+  const [activeSection, setActiveSection] = useState(null);
   const [amount, setAmount] = useState("");
   const [listForm, setListForm] = useState(emptyListForm());
   const [listModalOpen, setListModalOpen] = useState(false);
@@ -206,6 +280,31 @@ export default function Configuracion() {
     const configured = Number(parametros.monto_inscripcion || 0);
     setAmount(configured > 0 ? String(parametros.monto_inscripcion) : "");
   }, [parametros.monto_inscripcion]);
+
+  const locationsActive = resumen.localidades_activos ?? resumen.localidades_activas ?? 0;
+
+  const accessCards = useMemo(() => {
+    const paymentCount = Number(resumen.medios_pago_activos || 0);
+    const accountingCount = Number(resumen.contable_listas_activas || 0);
+
+    return [
+      {
+        id: "cuotas",
+        ...CONFIG_GROUPS.cuotas,
+        status: `${paymentCount} ${paymentCount === 1 ? "medio" : "medios"}`,
+      },
+      {
+        id: "socios",
+        ...CONFIG_GROUPS.socios,
+        status: `${Number(locationsActive || 0)} ${Number(locationsActive || 0) === 1 ? "localidad" : "localidades"}`,
+      },
+      {
+        id: "contable",
+        ...CONFIG_GROUPS.contable,
+        status: `${accountingCount} ${accountingCount === 1 ? "opción" : "opciones"}`,
+      },
+    ];
+  }, [locationsActive, resumen]);
 
   const saveAmount = async (event) => {
     event.preventDefault();
@@ -256,60 +355,125 @@ export default function Configuracion() {
     }
   };
 
-  const confirmState = async (event) => {
-    event.preventDefault();
-    if (!stateModal) return;
+  const confirmState = async () => {
+    if (!stateModal) return { ok: false };
     const id = itemId(stateModal.item);
     setSaving(true);
-    setFeedback(null);
     try {
       const response = stateModal.action === "eliminar"
         ? await configuracionApi.eliminarItem(stateModal.lista, id)
         : await configuracionApi.reactivarItem(stateModal.lista, id);
-      setStateModal(null);
-      setFeedback({ type: "success", message: response.mensaje });
       await cargar();
+      return response;
     } catch (err) {
-      setStateModal(null);
-      setFeedback({ type: "error", message: err.message });
+      throw err;
     } finally {
       setSaving(false);
     }
   };
 
   const currentMeta = LIST_META[listForm.lista] || LIST_META.medios_pago;
-  const locationsActive = resumen.localidades_activos ?? resumen.localidades_activas ?? 0;
+  const sectionMeta = activeSection && activeSection !== AMOUNT_SECTION
+    ? LIST_META[activeSection]
+    : null;
+  const sectionActiveCount = sectionMeta
+    ? activeSection === "localidades"
+      ? Number(locationsActive || 0)
+      : Number(resumen[sectionMeta.summaryKey] || 0)
+    : 0;
+  const activeGroupMeta = activeGroup ? CONFIG_GROUPS[activeGroup] : null;
+  const groupTabs = activeGroupMeta?.sections.length > 1
+    ? [{
+      type: "tabs",
+      label: `Opciones de ${activeGroupMeta.title}`,
+      value: activeSection,
+      onChange: (value) => {
+        setFeedback(null);
+        setActiveSection(value);
+      },
+      options: activeGroupMeta.sections,
+    }]
+    : [];
+
+  const feedbackNode = (
+    <ModuleFeedback
+      type={feedback?.type || "error"}
+      message={feedback?.message || error}
+      onClose={() => setFeedback(null)}
+    />
+  );
+
+  if (!activeGroup) {
+    return (
+      <ModulePage
+        title="Configuración"
+        description="Elegí una tarjeta para administrar cada parte del sistema de forma independiente."
+        canCreate={false}
+        notice={!writable ? "Tu usuario tiene permiso de consulta. Las modificaciones están deshabilitadas." : null}
+      >
+        {feedbackNode}
+        <div className="config-homeIntro">
+          <span className="config-homeIntro__icon" aria-hidden="true"><FontAwesomeIcon icon={faGear} /></span>
+          <div>
+            <small>PANEL DE CONFIGURACIÓN</small>
+            <strong>Todo organizado en accesos independientes</strong>
+            <p>Ingresá a una de las tres áreas y elegí la opción que necesitás desde sus pestañas.</p>
+          </div>
+        </div>
+
+        <div className="config-accessGrid">
+          {accessCards.map((card) => (
+            <ConfigAccessCard
+              key={card.id}
+              {...card}
+              onClick={() => {
+                setFeedback(null);
+                setActiveGroup(card.id);
+                setActiveSection(CONFIG_GROUPS[card.id].sections[0].value);
+              }}
+            />
+          ))}
+        </div>
+      </ModulePage>
+    );
+  }
+
+  const goBack = () => {
+    setFeedback(null);
+    setActiveGroup(null);
+    setActiveSection(null);
+  };
 
   return (
     <>
       <ModulePage
-        title="Configuración"
-        description="Administrá parámetros generales y todas las listas reutilizables del sistema."
-        canCreate={false}
-        onRefresh={cargar}
-        refreshing={loading}
+        title={activeGroupMeta.title}
+        description={activeGroupMeta.description}
+        filters={groupTabs}
+        tabsInTitle={groupTabs.length > 0}
+        primaryActionLabel="Agregar"
+        onPrimaryAction={sectionMeta && writable ? () => openNewItem(activeSection) : undefined}
+        canCreate={Boolean(sectionMeta && writable)}
+        secondaryActions={[{
+          key: "volver",
+          label: "Volver a configuración",
+          icon: faArrowLeft,
+          onClick: goBack,
+        }]}
         notice={!writable ? "Tu usuario tiene permiso de consulta. Las modificaciones están deshabilitadas." : null}
       >
-        <ModuleFeedback
-          type={feedback?.type || "error"}
-          message={feedback?.message || error}
-          onClose={() => setFeedback(null)}
-        />
+        {feedbackNode}
 
-        <div className="config-overview config-overview--four">
-          <div><FontAwesomeIcon icon={faGear} /><span>Parámetros centralizados</span><strong>1</strong></div>
-          <div><FontAwesomeIcon icon={faMoneyBillTransfer} /><span>Medios de pago activos</span><strong>{resumen.medios_pago_activos || 0}</strong></div>
-          <div><FontAwesomeIcon icon={faLocationDot} /><span>Localidades activas</span><strong>{locationsActive}</strong></div>
-          <div><FontAwesomeIcon icon={faCashRegister} /><span>Opciones contables activas</span><strong>{resumen.contable_listas_activas || 0}</strong></div>
-        </div>
-
-        <div className="config-grid">
-          <SettingsCard
-            icon={faCashRegister}
-            title="Monto de inscripción"
-            description="Importe base por integrante que Cuotas completa automáticamente al registrar una inscripción."
-            badge="CUOTAS"
-          >
+        {activeSection === AMOUNT_SECTION ? (
+          <section className="config-detailPanel config-detailPanel--amount">
+            <div className="config-detailPanel__lead">
+              <span className="config-detailPanel__icon"><FontAwesomeIcon icon={faCashRegister} /></span>
+              <div>
+                <small>CUOTAS</small>
+                <h2>Importe predeterminado</h2>
+                <p>Este valor funciona como punto de partida y puede modificarse manualmente en casos excepcionales.</p>
+              </div>
+            </div>
             <form className="config-amountForm" onSubmit={saveAmount}>
               <label className="entity-field">
                 <span>Monto predeterminado *</span>
@@ -335,39 +499,31 @@ export default function Configuracion() {
                 </button>
               ) : null}
             </form>
-            <p className="config-help">El importe queda como valor inicial en el pago. Puede ajustarse manualmente para una excepción sin modificar la configuración general.</p>
-          </SettingsCard>
-
-          {CONFIG_LIST_ORDER.map((listKey) => {
-            const meta = LIST_META[listKey];
-            const activeCount = listKey === "localidades"
-              ? locationsActive
-              : Number(resumen[meta.summaryKey] || 0);
-            return (
-              <SettingsCard
-                key={listKey}
-                icon={meta.icon}
-                title={meta.title}
-                description={meta.description}
-                badge={`${activeCount} ${activeCount === 1 ? "ACTIVA" : "ACTIVAS"}`}
-                action={writable ? (
-                  <button className="config-addButton" type="button" onClick={() => openNewItem(listKey)}>
-                    <FontAwesomeIcon icon={faPlus} /> Agregar
-                  </button>
-                ) : null}
-              >
-                <ConfigList
-                  items={listas[listKey] || []}
-                  listKey={listKey}
-                  emptyText={meta.empty}
-                  writable={writable}
-                  onEdit={openEditItem}
-                  onState={(lista, item, action) => setStateModal({ lista, item, action })}
-                />
-              </SettingsCard>
-            );
-          })}
-        </div>
+          </section>
+        ) : (
+          <section className="config-detailPanel config-detailPanel--list">
+            <header className="config-listSummary">
+              <span className="config-detailPanel__icon"><FontAwesomeIcon icon={sectionMeta.icon} /></span>
+              <div>
+                <small>{sectionMeta.area.toLocaleUpperCase("es-AR")}</small>
+                <h2>{sectionMeta.title}</h2>
+                <p>{sectionMeta.detail}</p>
+              </div>
+              <span className="config-listSummary__count">
+                <strong>{sectionActiveCount}</strong>
+                <small>{sectionActiveCount === 1 ? sectionMeta.activeSingular : sectionMeta.activePlural}</small>
+              </span>
+            </header>
+            <ConfigList
+              items={listas[activeSection] || []}
+              listKey={activeSection}
+              emptyText={sectionMeta.empty}
+              writable={writable}
+              onEdit={openEditItem}
+              onState={(lista, item, action) => setStateModal({ lista, item, action })}
+            />
+          </section>
+        )}
       </ModulePage>
 
       <CrudModal
@@ -405,24 +561,49 @@ export default function Configuracion() {
         </div>
       </CrudModal>
 
-      <CrudModal
+      <ModalEliminarGlobal
         open={Boolean(stateModal)}
-        title={stateModal?.action === "eliminar" ? "Eliminar opción" : "Reactivar opción"}
-        subtitle={stateModal?.item?.nombre || ""}
+        operacion={stateModal?.action === "reactivar"
+          ? "alta"
+          : Number(stateModal?.item?.cantidad_usos || 0) === 0
+            ? "eliminar"
+            : "baja"}
+        row={stateModal?.item || null}
+        title={stateModal?.action === "reactivar"
+          ? "Reactivar opción"
+          : Number(stateModal?.item?.cantidad_usos || 0) === 0
+            ? "Eliminar opción"
+            : "Desactivar opción"}
+        message={stateModal?.action === "reactivar"
+          ? "La opción volverá a estar disponible en los formularios del sistema."
+          : Number(stateModal?.item?.cantidad_usos || 0) === 0
+            ? "La opción no tiene registros asociados y se eliminará definitivamente."
+            : "La opción tiene registros asociados y se desactivará para conservar el historial."}
+        warning={stateModal?.action === "eliminar" && Number(stateModal?.item?.cantidad_usos || 0) === 0
+          ? "Esta acción no se puede deshacer."
+          : ""}
+        confirmLabel={stateModal?.action === "reactivar"
+          ? "Reactivar"
+          : Number(stateModal?.item?.cantidad_usos || 0) === 0
+            ? "Eliminar"
+            : "Desactivar"}
+        loadingLabel={stateModal?.action === "reactivar" ? "Reactivando..." : "Procesando..."}
+        loadingMessage={stateModal?.action === "reactivar" ? "Reactivando opción…" : "Procesando opción…"}
+        successMessage={stateModal?.action === "reactivar"
+          ? "Opción reactivada correctamente."
+          : Number(stateModal?.item?.cantidad_usos || 0) === 0
+            ? "Opción eliminada correctamente."
+            : "Opción desactivada correctamente."}
+        errorMessage="No se pudo actualizar la opción."
+        details={stateModal ? [
+          { label: "Opción", value: stateModal.item?.nombre },
+          { label: "Sección", value: LIST_META[stateModal.lista]?.title },
+          { label: "Usos", value: Number(stateModal.item?.cantidad_usos || 0) },
+        ] : []}
         onClose={() => setStateModal(null)}
-        onSubmit={confirmState}
-        saving={saving}
-        submitLabel={stateModal?.action === "eliminar" ? "Eliminar" : "Reactivar"}
-        danger={stateModal?.action === "eliminar"}
-      >
-        <p className="entity-confirm-text">
-          {stateModal?.action === "eliminar"
-            ? Number(stateModal?.item?.cantidad_usos || 0) === 0
-              ? "La opción no tiene registros asociados y se eliminará definitivamente de la base de datos."
-              : "La opción tiene registros asociados. Para conservar el historial no se borrará: quedará inactiva y dejará de aparecer en los formularios nuevos."
-            : "La opción volverá a estar disponible en los formularios del sistema."}
-        </p>
-      </CrudModal>
+        onConfirm={confirmState}
+        loading={saving}
+      />
     </>
   );
 }

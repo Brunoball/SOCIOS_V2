@@ -1,14 +1,22 @@
 import React, { useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faAddressBook,
+  faHouse,
   faPen,
   faRotateLeft,
   faToggleOff,
+  faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../../Global/components/ModulePage";
 import CrudModal from "../../Global/components/CrudModal";
 import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../../Global/components/ModuleFeedback";
+import {
+  EntityFormPanel,
+  EntityTabs,
+  FloatingField,
+} from "../../Global/components/TabbedForm";
 import { canWrite } from "../../Global/auth/session";
 import { familiasApi } from "../api/familiasApi";
 import { useFamilias } from "../hooks/useFamilias";
@@ -16,6 +24,8 @@ import "./Familias.css";
 import "./FamiliasModal.css";
 
 const upper = (value) => value.toLocaleUpperCase("es-AR");
+const FORM_TAB_DETAILS = "details";
+const FORM_TAB_MEMBERS = "members";
 const emptyForm = () => ({
   id_familia: "",
   nombre: "",
@@ -23,7 +33,7 @@ const emptyForm = () => ({
   integrante_ids: [],
 });
 
-function FamilyForm({ form, setForm, partners }) {
+function FamilyForm({ form, setForm, partners, activeTab, onTabChange }) {
   const [memberSearch, setMemberSearch] = useState("");
   const visible = partners.filter(
     (partner) =>
@@ -42,89 +52,157 @@ function FamilyForm({ form, setForm, partners }) {
     }));
   return (
     <div className="entity-form familias-modal__form">
-      <div className="entity-form__grid entity-form__grid--single">
-        <label className="entity-field">
-          <span>Nombre de la familia *</span>
-          <input
-            value={form.nombre}
-            onChange={(e) =>
-              setForm((current) => ({
-                ...current,
-                nombre: upper(e.target.value),
-              }))
-            }
-            required
-            maxLength={150}
-            placeholder="EJ.: FAMILIA GONZÁLEZ"
-          />
-        </label>
-        <label className="entity-field">
-          <span>Descripción</span>
-          <textarea
-            value={form.descripcion}
-            onChange={(e) =>
-              setForm((current) => ({
-                ...current,
-                descripcion: upper(e.target.value),
-              }))
-            }
-            rows={3}
-            maxLength={500}
-          />
-        </label>
-      </div>
-      <fieldset className="entity-checks familias-modal__members">
-        <legend>Integrantes *</legend>
-        <input
-          className="entity-modal-input familias-modal__member-search"
-          type="search"
-          value={memberSearch}
-          onChange={(e) => setMemberSearch(e.target.value)}
-          placeholder="Buscar socio por nombre o DNI"
-        />
-        <div className="familias-modal__member-list">
-          {visible.map((partner) => {
-            const belongsElsewhere =
-              partner.id_familia &&
-              partner.familia_activa !== false &&
-              partner.id_familia !== Number(form.id_familia || 0);
-            const selected = form.integrante_ids.includes(partner.id_socio);
-            const inactive = partner.activo === false;
-            return (
-              <label
-                key={partner.id_socio}
-                className={`entity-check-option ${selected ? "is-selected" : ""}`.trim()}
-                title={
-                  belongsElsewhere
-                    ? `Ya pertenece a ${partner.familia}`
-                    : inactive
-                      ? "Socio dado de baja"
-                      : ""
-                }
-              >
-                <input
-                  type="checkbox"
-                  checked={selected}
-                  disabled={Boolean(
-                    belongsElsewhere || (inactive && !selected),
-                  )}
-                  onChange={() => toggle(partner.id_socio)}
-                />
-                <span>
-                  {partner.apellido}, {partner.nombre} · DNI {partner.dni}
-                  {belongsElsewhere ? ` · ${partner.familia}` : ""}
-                  {inactive ? " · SOCIO DADO DE BAJA" : ""}
-                </span>
-              </label>
-            );
-          })}
-          {!visible.length ? (
-            <p className="entity-help">
-              No hay socios disponibles con esa búsqueda.
-            </p>
-          ) : null}
-        </div>
-      </fieldset>
+      <EntityTabs
+        tabs={[
+          {
+            value: FORM_TAB_DETAILS,
+            label: "Datos de la familia",
+            icon: faHouse,
+          },
+          {
+            value: FORM_TAB_MEMBERS,
+            label: "Integrantes",
+            icon: faUsers,
+            badge: form.integrante_ids.length || null,
+          },
+        ]}
+        value={activeTab}
+        onChange={onTabChange}
+        idPrefix="familia-form-tab"
+        ariaLabel="Secciones de la ficha de la familia"
+      />
+
+      {activeTab === FORM_TAB_DETAILS ? (
+        <EntityFormPanel
+          tabValue={FORM_TAB_DETAILS}
+          idPrefix="familia-form-tab"
+          eyebrow="Ficha principal"
+          title="Datos de la familia"
+          icon={faAddressBook}
+          tag="Nombre obligatorio"
+          bodyClassName="familias-form-panel__body--details"
+          hint="Definí un nombre claro para identificar al grupo. Después podés seleccionar sus integrantes desde la siguiente pestaña."
+        >
+          <FloatingField
+            label="Nombre de la familia *"
+            active={Boolean(form.nombre)}
+          >
+            <input
+              value={form.nombre}
+              onChange={(e) =>
+                setForm((current) => ({
+                  ...current,
+                  nombre: upper(e.target.value),
+                }))
+              }
+              maxLength={150}
+              placeholder=" "
+              autoFocus
+            />
+          </FloatingField>
+          <FloatingField
+            label="Descripción"
+            active={Boolean(form.descripcion)}
+            textarea
+          >
+            <textarea
+              value={form.descripcion}
+              onChange={(e) =>
+                setForm((current) => ({
+                  ...current,
+                  descripcion: upper(e.target.value),
+                }))
+              }
+              rows={3}
+              maxLength={500}
+              placeholder=" "
+            />
+          </FloatingField>
+        </EntityFormPanel>
+      ) : (
+        <EntityFormPanel
+          tabValue={FORM_TAB_MEMBERS}
+          idPrefix="familia-form-tab"
+          eyebrow="Composición del grupo"
+          title="Integrantes de la familia"
+          icon={faUsers}
+          tag={
+            form.integrante_ids.length
+              ? `${form.integrante_ids.length} ${form.integrante_ids.length === 1 ? "integrante" : "integrantes"}`
+              : "Sin integrantes"
+          }
+          bodyClassName="familias-form-panel__body--members"
+        >
+          <div className="familias-modal__search-row">
+            <FloatingField
+              label="Buscar socio por nombre o DNI"
+              active={Boolean(memberSearch)}
+              className="familias-modal__member-search"
+            >
+              <input
+                type="search"
+                value={memberSearch}
+                onChange={(e) => setMemberSearch(e.target.value)}
+                placeholder=" "
+              />
+            </FloatingField>
+          </div>
+
+          <fieldset className="entity-checks familias-modal__members">
+            <legend>
+              <FontAwesomeIcon icon={faUsers} /> Socios disponibles
+            </legend>
+            <div className="familias-modal__member-list">
+              {visible.map((partner) => {
+                const belongsElsewhere =
+                  partner.id_familia &&
+                  partner.familia_activa !== false &&
+                  partner.id_familia !== Number(form.id_familia || 0);
+                const selected = form.integrante_ids.includes(partner.id_socio);
+                const inactive = partner.activo === false;
+                return (
+                  <label
+                    key={partner.id_socio}
+                    className={`entity-check-option familias-modal__member ${selected ? "is-selected" : ""}`.trim()}
+                    title={
+                      belongsElsewhere
+                        ? `Ya pertenece a ${partner.familia}`
+                        : inactive
+                          ? "Socio dado de baja"
+                          : ""
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      disabled={Boolean(
+                        belongsElsewhere || (inactive && !selected),
+                      )}
+                      onChange={() => toggle(partner.id_socio)}
+                    />
+                    <span className="familias-modal__member-copy">
+                      <strong>
+                        {partner.apellido}, {partner.nombre}
+                      </strong>
+                      <small>
+                        DNI {partner.dni}
+                        {belongsElsewhere ? ` · ${partner.familia}` : ""}
+                        {inactive ? " · SOCIO DADO DE BAJA" : ""}
+                      </small>
+                    </span>
+                  </label>
+                );
+              })}
+              {!visible.length ? (
+                <div className="familias-modal__empty">
+                  <strong>Sin resultados</strong>
+                  <span>No hay socios disponibles con esa búsqueda.</span>
+                </div>
+              ) : null}
+            </div>
+          </fieldset>
+        </EntityFormPanel>
+      )}
     </div>
   );
 }
@@ -139,6 +217,7 @@ export default function Familias() {
   );
   const { items, catalogos, loading, error, cargar } = useFamilias(filters);
   const [form, setForm] = useState(emptyForm());
+  const [formTab, setFormTab] = useState(FORM_TAB_DETAILS);
   const [modalOpen, setModalOpen] = useState(false);
   const [stateModal, setStateModal] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -167,6 +246,7 @@ export default function Familias() {
   ];
   const openNew = () => {
     setForm(emptyForm());
+    setFormTab(FORM_TAB_DETAILS);
     setModalOpen(true);
   };
   const openEdit = (item) => {
@@ -176,10 +256,30 @@ export default function Familias() {
       descripcion: item.descripcion || "",
       integrante_ids: item.integrante_ids || [],
     });
+    setFormTab(FORM_TAB_DETAILS);
     setModalOpen(true);
   };
   const save = async (event) => {
     event.preventDefault();
+
+    if (!form.nombre.trim()) {
+      setFormTab(FORM_TAB_DETAILS);
+      setFeedback({
+        type: "error",
+        message: "Completá el nombre de la familia.",
+      });
+      return;
+    }
+
+    if (!form.integrante_ids.length) {
+      setFormTab(FORM_TAB_MEMBERS);
+      setFeedback({
+        type: "error",
+        message: "Seleccioná al menos un integrante para la familia.",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const response = await familiasApi.guardar(form);
@@ -338,6 +438,8 @@ export default function Familias() {
           form={form}
           setForm={setForm}
           partners={catalogos.socios || []}
+          activeTab={formTab}
+          onTabChange={setFormTab}
         />
       </CrudModal>
       <ModalEliminarGlobal
