@@ -26,9 +26,11 @@ export default function App() {
           <Route path="/socios/familias" element={<Familias />} />
           <Route path="/cuotas" element={<Cuotas />} />
           <Route path="/categorias" element={<Categorias />} />
-          <Route path="/contable" element={<Contable />} />
+          <Route path="/categorias/descuentos" element={<Categorias />} />
+          <Route path="/contable" element={<Navigate to="/contable/ingresos" replace />} />
           <Route path="/contable/ingresos" element={<Contable />} />
           <Route path="/contable/egresos" element={<Contable />} />
+          <Route path="/contable/resumen" element={<Contable />} />
           <Route path="/configuracion" element={<Configuracion />} />
         </Route>
         <Route path="*" element={<Navigate to="/panel" replace />} />

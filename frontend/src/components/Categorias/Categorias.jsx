@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCalendarDays,
@@ -240,8 +241,12 @@ function DiscountForm({ form, setForm }) {
 }
 
 export default function Categorias() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const writable = canWrite();
-  const [section, setSection] = useState("categorias");
+  const section = location.pathname.endsWith("/descuentos")
+    ? "descuentos"
+    : "categorias";
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const filters = useMemo(
@@ -411,7 +416,9 @@ export default function Categorias() {
       ariaLabel: "Configuración de categorías",
       value: section,
       onChange: (value) => {
-        setSection(value);
+        const targetPath =
+          value === "descuentos" ? "/categorias/descuentos" : "/categorias";
+        if (location.pathname !== targetPath) navigate(targetPath);
         setFeedback(null);
       },
       options: [

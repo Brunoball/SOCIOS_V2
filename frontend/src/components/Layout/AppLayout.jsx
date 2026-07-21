@@ -23,16 +23,38 @@ const APP_NAME = "Gestión de Socios";
 const NAV_ITEMS = [
   { key: "administracion", label: "Administración", path: "/panel", icon: faChartLine },
   {
-    key: "socios", label: "Socios", path: "/socios", icon: faUsers,
-    children: [{ key: "familias", label: "Familias", path: "/socios/familias" }],
+    key: "socios",
+    label: "Socios",
+    path: "/socios",
+    defaultPath: "/socios",
+    icon: faUsers,
+    children: [
+      { key: "socios-listado", label: "Listado de socios", path: "/socios" },
+      { key: "familias", label: "Familias", path: "/socios/familias" },
+    ],
   },
   { key: "cuotas", label: "Cuotas", path: "/cuotas", icon: faReceipt },
-  { key: "categorias", label: "Categorías", path: "/categorias", icon: faTags },
   {
-    key: "contable", label: "Contable", path: "/contable", icon: faWallet,
+    key: "categorias",
+    label: "Categorías",
+    path: "/categorias",
+    defaultPath: "/categorias",
+    icon: faTags,
+    children: [
+      { key: "categorias-listado", label: "Categorías", path: "/categorias" },
+      { key: "categorias-descuentos", label: "Descuentos familiares", path: "/categorias/descuentos" },
+    ],
+  },
+  {
+    key: "contable",
+    label: "Contable",
+    path: "/contable",
+    defaultPath: "/contable/ingresos",
+    icon: faWallet,
     children: [
       { key: "contable-ingresos", label: "Ingresos", path: "/contable/ingresos" },
       { key: "contable-egresos", label: "Egresos", path: "/contable/egresos" },
+      { key: "contable-resumen", label: "Resumen", path: "/contable/resumen" },
     ],
   },
 ];
@@ -139,7 +161,7 @@ export default function AppLayout() {
             return (
               <div className={`pp-navGroup ${item.children ? "has-sub" : ""} ${groupOpen ? "is-open" : ""}`} key={item.key}>
                 {item.children ? (
-                  <NavLink className={`pp-nav__item ${active ? "is-active" : ""}`} to={item.path}>
+                  <NavLink className={`pp-nav__item ${active ? "is-active" : ""}`} to={item.defaultPath || item.path}>
                     <span className="pp-nav__icon"><FontAwesomeIcon icon={item.icon} /></span><span className="pp-nav__label">{item.label}</span>
                   </NavLink>
                 ) : (
@@ -150,7 +172,7 @@ export default function AppLayout() {
                 {item.children && groupOpen ? (
                   <div className="pp-navSub">
                     {item.children.map((child) => (
-                      <NavLink className={({ isActive }) => `pp-navSub__item ${isActive ? "is-active" : ""}`} to={child.path} key={child.key}>
+                      <NavLink end className={({ isActive }) => `pp-navSub__item ${isActive ? "is-active" : ""}`} to={child.path} key={child.key}>
                         <span className="pp-navSub__dot" /><span className="pp-navSub__label">{child.label}</span>
                       </NavLink>
                     ))}
