@@ -2,18 +2,35 @@ import React, { useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faAddressBook,
+  faCalendarDays,
+  faCheckCircle,
   faCircleInfo,
+  faClockRotateLeft,
+  faHouse,
   faIdCard,
   faPen,
+  faReceipt,
   faRotateLeft,
   faTags,
   faUser,
   faUserSlash,
+  faWallet,
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../Global/components/ModulePage";
 import CrudModal from "../Global/components/CrudModal";
+import InfoModal, {
+  InfoEmpty,
+  InfoRow,
+  InfoSection,
+  InfoSummary,
+} from "../Global/components/InfoModal";
 import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../Global/components/ModuleFeedback";
+import {
+  EntityFormPanel,
+  EntityTabs,
+  FloatingField,
+} from "../Global/components/TabbedForm";
 import { canWrite } from "../Global/auth/session";
 import { sociosApi } from "./api/sociosApi";
 import { useSocios } from "./hooks/useSocios";
@@ -29,6 +46,8 @@ const dateToday = () => {
 const upper = (value) => value.toLocaleUpperCase("es-AR");
 const FORM_TAB_PERSONAL = "personal";
 const FORM_TAB_MEMBERSHIP = "membership";
+const INFO_TAB_SUMMARY = "summary";
+const INFO_TAB_ACTIVITY = "activity";
 const formatDate = (value) =>
   value
     ? new Intl.DateTimeFormat("es-AR", { timeZone: "UTC" }).format(
@@ -55,23 +74,6 @@ function emptyForm(catalogos) {
     observaciones: "",
     categoria_ids: [],
   };
-}
-
-function FloatingField({
-  label,
-  active = false,
-  wide = false,
-  textarea = false,
-  children,
-}) {
-  return (
-    <label
-      className={`entity-field socios-floating-field ${wide ? "entity-field--wide" : ""} ${textarea ? "is-textarea" : ""} ${active ? "is-active" : ""}`.trim()}
-    >
-      {children}
-      <span>{label}</span>
-    </label>
-  );
 }
 
 function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
@@ -102,273 +104,232 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
 
   return (
     <div className="entity-form socios-modal__form">
-      <div
-        className="socios-modal-tabs"
-        role="tablist"
-        aria-label="Secciones de la ficha del socio"
-      >
-        <button
-          type="button"
-          role="tab"
-          id="socio-tab-personal"
-          aria-controls="socio-panel-personal"
-          aria-selected={activeTab === FORM_TAB_PERSONAL}
-          className={`socios-modal-tab ${activeTab === FORM_TAB_PERSONAL ? "is-active" : ""}`}
-          onClick={() => onTabChange(FORM_TAB_PERSONAL)}
-        >
-          <FontAwesomeIcon icon={faUser} />
-          <span>Datos personales</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          id="socio-tab-membership"
-          aria-controls="socio-panel-membership"
-          aria-selected={activeTab === FORM_TAB_MEMBERSHIP}
-          className={`socios-modal-tab ${activeTab === FORM_TAB_MEMBERSHIP ? "is-active" : ""}`}
-          onClick={() => onTabChange(FORM_TAB_MEMBERSHIP)}
-        >
-          <FontAwesomeIcon icon={faAddressBook} />
-          <span>Contacto y membresía</span>
-          {form.categoria_ids.length ? (
-            <span className="socios-modal-tab__badge">
-              {form.categoria_ids.length}
-            </span>
-          ) : null}
-        </button>
-      </div>
+      <EntityTabs
+        tabs={[
+          {
+            value: FORM_TAB_PERSONAL,
+            label: "Datos personales",
+            icon: faUser,
+          },
+          {
+            value: FORM_TAB_MEMBERSHIP,
+            label: "Contacto y membresía",
+            icon: faAddressBook,
+            badge: form.categoria_ids.length || null,
+          },
+        ]}
+        value={activeTab}
+        onChange={onTabChange}
+        idPrefix="socio-form-tab"
+        ariaLabel="Secciones de la ficha del socio"
+      />
 
       {activeTab === FORM_TAB_PERSONAL ? (
-        <section
-          className="socios-form-panel"
-          id="socio-panel-personal"
-          role="tabpanel"
-          aria-labelledby="socio-tab-personal"
+        <EntityFormPanel
+          tabValue={FORM_TAB_PERSONAL}
+          idPrefix="socio-form-tab"
+          eyebrow="Ficha principal"
+          title="Identidad del socio"
+          icon={faIdCard}
+          tag="Datos obligatorios"
+          bodyClassName="entity-form__grid"
+          hint="Completá los datos identificatorios. En la siguiente pestaña podés agregar el contacto, la ubicación y las categorías."
         >
-          <header className="socios-form-panel__header">
-            <div>
-              <span>Ficha principal</span>
-              <h3>
-                <FontAwesomeIcon icon={faIdCard} /> Identidad del socio
-              </h3>
-            </div>
-            <small>Datos obligatorios</small>
-          </header>
-          <div className="socios-form-panel__body entity-form__grid">
-            <FloatingField label="Apellido *" active={Boolean(form.apellido)}>
+          <FloatingField label="Apellido *" active={Boolean(form.apellido)}>
+            <input
+              value={form.apellido}
+              placeholder=" "
+              onChange={(e) => update("apellido", upper(e.target.value))}
+              maxLength={120}
+              autoFocus
+            />
+          </FloatingField>
+          <FloatingField label="Nombre *" active={Boolean(form.nombre)}>
+            <input
+              value={form.nombre}
+              placeholder=" "
+              onChange={(e) => update("nombre", upper(e.target.value))}
+              maxLength={120}
+            />
+          </FloatingField>
+          <FloatingField label="DNI *" active={Boolean(form.dni)}>
+            <input
+              value={form.dni}
+              placeholder=" "
+              onChange={(e) => update("dni", e.target.value.replace(/\D/g, ""))}
+              maxLength={9}
+              inputMode="numeric"
+            />
+          </FloatingField>
+          <FloatingField label="Fecha de nacimiento" active>
+            <input
+              type="date"
+              value={form.fecha_nacimiento}
+              max={dateToday()}
+              onChange={(e) => update("fecha_nacimiento", e.target.value)}
+            />
+          </FloatingField>
+          <FloatingField label="Sexo" active>
+            <select
+              value={form.sexo}
+              onChange={(e) => update("sexo", e.target.value)}
+            >
+              <option value="NO_INFORMA">NO INFORMA</option>
+              <option value="MASCULINO">MASCULINO</option>
+              <option value="FEMENINO">FEMENINO</option>
+              <option value="OTRO">OTRO</option>
+            </select>
+          </FloatingField>
+          <FloatingField label="Fecha de ingreso *" active>
+            <input
+              type="date"
+              value={form.fecha_ingreso}
+              max={dateToday()}
+              onChange={(e) => update("fecha_ingreso", e.target.value)}
+            />
+          </FloatingField>
+        </EntityFormPanel>
+      ) : (
+        <EntityFormPanel
+          tabValue={FORM_TAB_MEMBERSHIP}
+          idPrefix="socio-form-tab"
+          eyebrow="Información complementaria"
+          title="Contacto y membresía"
+          icon={faAddressBook}
+          tag={
+            form.categoria_ids.length
+              ? `${form.categoria_ids.length} ${form.categoria_ids.length === 1 ? "categoría" : "categorías"}`
+              : "Sin categorías"
+          }
+          bodyClassName="socios-form-panel__body--membership"
+        >
+          <div className="entity-form__grid socios-contact-grid">
+            <FloatingField
+              label="Domicilio"
+              active={Boolean(form.domicilio)}
+              wide
+            >
               <input
-                value={form.apellido}
+                value={form.domicilio}
                 placeholder=" "
-                onChange={(e) => update("apellido", upper(e.target.value))}
-                maxLength={120}
-                autoFocus
+                onChange={(e) => update("domicilio", upper(e.target.value))}
+                maxLength={255}
               />
             </FloatingField>
-            <FloatingField label="Nombre *" active={Boolean(form.nombre)}>
-              <input
-                value={form.nombre}
-                placeholder=" "
-                onChange={(e) => update("nombre", upper(e.target.value))}
-                maxLength={120}
-              />
-            </FloatingField>
-            <FloatingField label="DNI *" active={Boolean(form.dni)}>
-              <input
-                value={form.dni}
-                placeholder=" "
-                onChange={(e) =>
-                  update("dni", e.target.value.replace(/\D/g, ""))
-                }
-                maxLength={9}
-                inputMode="numeric"
-              />
-            </FloatingField>
-            <FloatingField label="Fecha de nacimiento" active>
-              <input
-                type="date"
-                value={form.fecha_nacimiento}
-                max={dateToday()}
-                onChange={(e) => update("fecha_nacimiento", e.target.value)}
-              />
-            </FloatingField>
-            <FloatingField label="Sexo" active>
+            <FloatingField label="Localidad *" active>
               <select
-                value={form.sexo}
-                onChange={(e) => update("sexo", e.target.value)}
+                value={form.id_localidad}
+                onChange={(e) => update("id_localidad", e.target.value)}
               >
-                <option value="NO_INFORMA">NO INFORMA</option>
-                <option value="MASCULINO">MASCULINO</option>
-                <option value="FEMENINO">FEMENINO</option>
-                <option value="OTRO">OTRO</option>
+                {locations.map((item) => (
+                  <option key={item.id_localidad} value={item.id_localidad}>
+                    {item.nombre}
+                  </option>
+                ))}
+                <option value="__new__">+ AGREGAR LOCALIDAD</option>
               </select>
             </FloatingField>
-            <FloatingField label="Fecha de ingreso *" active>
+            {form.id_localidad === "__new__" ? (
+              <FloatingField
+                label="Nueva localidad *"
+                active={Boolean(form.localidad_nueva)}
+              >
+                <input
+                  value={form.localidad_nueva}
+                  placeholder=" "
+                  onChange={(e) =>
+                    update("localidad_nueva", upper(e.target.value))
+                  }
+                  maxLength={120}
+                />
+              </FloatingField>
+            ) : (
+              <FloatingField label="Teléfono" active={Boolean(form.telefono)}>
+                <input
+                  value={form.telefono}
+                  placeholder=" "
+                  onChange={(e) => update("telefono", e.target.value)}
+                  maxLength={50}
+                  inputMode="tel"
+                />
+              </FloatingField>
+            )}
+            {form.id_localidad === "__new__" ? (
+              <FloatingField label="Teléfono" active={Boolean(form.telefono)}>
+                <input
+                  value={form.telefono}
+                  placeholder=" "
+                  onChange={(e) => update("telefono", e.target.value)}
+                  maxLength={50}
+                  inputMode="tel"
+                />
+              </FloatingField>
+            ) : null}
+            <FloatingField
+              label="Email"
+              active={Boolean(form.email)}
+              wide={form.id_localidad !== "__new__"}
+            >
               <input
-                type="date"
-                value={form.fecha_ingreso}
-                max={dateToday()}
-                onChange={(e) => update("fecha_ingreso", e.target.value)}
+                type="text"
+                inputMode="email"
+                value={form.email}
+                placeholder=" "
+                onChange={(e) => update("email", e.target.value)}
+                maxLength={190}
+              />
+            </FloatingField>
+            <FloatingField
+              label="Observaciones"
+              active={Boolean(form.observaciones)}
+              textarea
+              wide
+            >
+              <textarea
+                value={form.observaciones}
+                placeholder=" "
+                onChange={(e) => update("observaciones", upper(e.target.value))}
+                rows={2}
+                maxLength={5000}
               />
             </FloatingField>
           </div>
-          <p className="socios-form-panel__hint">
-            Completá los datos identificatorios. En la siguiente pestaña podés
-            agregar el contacto, la ubicación y las categorías.
-          </p>
-        </section>
-      ) : (
-        <section
-          className="socios-form-panel"
-          id="socio-panel-membership"
-          role="tabpanel"
-          aria-labelledby="socio-tab-membership"
-        >
-          <header className="socios-form-panel__header">
-            <div>
-              <span>Información complementaria</span>
-              <h3>
-                <FontAwesomeIcon icon={faAddressBook} /> Contacto y membresía
-              </h3>
-            </div>
-            <small>
-              {form.categoria_ids.length
-                ? `${form.categoria_ids.length} ${form.categoria_ids.length === 1 ? "categoría" : "categorías"}`
-                : "Sin categorías"}
-            </small>
-          </header>
-          <div className="socios-form-panel__body socios-form-panel__body--membership">
-            <div className="entity-form__grid socios-contact-grid">
-              <FloatingField
-                label="Domicilio"
-                active={Boolean(form.domicilio)}
-                wide
-              >
-                <input
-                  value={form.domicilio}
-                  placeholder=" "
-                  onChange={(e) => update("domicilio", upper(e.target.value))}
-                  maxLength={255}
-                />
-              </FloatingField>
-              <FloatingField label="Localidad *" active>
-                <select
-                  value={form.id_localidad}
-                  onChange={(e) => update("id_localidad", e.target.value)}
-                >
-                  {locations.map((item) => (
-                    <option key={item.id_localidad} value={item.id_localidad}>
-                      {item.nombre}
-                    </option>
-                  ))}
-                  <option value="__new__">+ AGREGAR LOCALIDAD</option>
-                </select>
-              </FloatingField>
-              {form.id_localidad === "__new__" ? (
-                <FloatingField
-                  label="Nueva localidad *"
-                  active={Boolean(form.localidad_nueva)}
-                >
-                  <input
-                    value={form.localidad_nueva}
-                    placeholder=" "
-                    onChange={(e) =>
-                      update("localidad_nueva", upper(e.target.value))
-                    }
-                    maxLength={120}
-                  />
-                </FloatingField>
-              ) : (
-                <FloatingField label="Teléfono" active={Boolean(form.telefono)}>
-                  <input
-                    value={form.telefono}
-                    placeholder=" "
-                    onChange={(e) => update("telefono", e.target.value)}
-                    maxLength={50}
-                    inputMode="tel"
-                  />
-                </FloatingField>
-              )}
-              {form.id_localidad === "__new__" ? (
-                <FloatingField label="Teléfono" active={Boolean(form.telefono)}>
-                  <input
-                    value={form.telefono}
-                    placeholder=" "
-                    onChange={(e) => update("telefono", e.target.value)}
-                    maxLength={50}
-                    inputMode="tel"
-                  />
-                </FloatingField>
-              ) : null}
-              <FloatingField
-                label="Email"
-                active={Boolean(form.email)}
-                wide={form.id_localidad !== "__new__"}
-              >
-                <input
-                  type="text"
-                  inputMode="email"
-                  value={form.email}
-                  placeholder=" "
-                  onChange={(e) => update("email", e.target.value)}
-                  maxLength={190}
-                />
-              </FloatingField>
-              <FloatingField
-                label="Observaciones"
-                active={Boolean(form.observaciones)}
-                textarea
-                wide
-              >
-                <textarea
-                  value={form.observaciones}
-                  placeholder=" "
-                  onChange={(e) =>
-                    update("observaciones", upper(e.target.value))
+          <fieldset className="entity-checks socios-modal__categories">
+            <legend>
+              <FontAwesomeIcon icon={faTags} /> Categorías del socio
+            </legend>
+            {(catalogos.categorias || []).length ? (
+              (catalogos.categorias || []).map((category) => (
+                <label
+                  key={category.id_categoria}
+                  className={
+                    form.categoria_ids.includes(category.id_categoria)
+                      ? "is-selected"
+                      : ""
                   }
-                  rows={2}
-                  maxLength={5000}
-                />
-              </FloatingField>
-            </div>
-            <fieldset className="entity-checks socios-modal__categories">
-              <legend>
-                <FontAwesomeIcon icon={faTags} /> Categorías del socio
-              </legend>
-              {(catalogos.categorias || []).length ? (
-                (catalogos.categorias || []).map((category) => (
-                  <label
-                    key={category.id_categoria}
-                    className={
-                      form.categoria_ids.includes(category.id_categoria)
-                        ? "is-selected"
-                        : ""
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.categoria_ids.includes(category.id_categoria)}
+                    disabled={
+                      !category.activo &&
+                      !form.categoria_ids.includes(category.id_categoria)
                     }
-                  >
-                    <input
-                      type="checkbox"
-                      checked={form.categoria_ids.includes(
-                        category.id_categoria,
-                      )}
-                      disabled={
-                        !category.activo &&
-                        !form.categoria_ids.includes(category.id_categoria)
-                      }
-                      onChange={() => toggleCategory(category.id_categoria)}
-                    />
-                    <span>
-                      {category.nombre}
-                      {category.activo ? "" : " (BAJA)"}
-                    </span>
-                  </label>
-                ))
-              ) : (
-                <p className="entity-help">
-                  Primero creá una categoría para poder asignarla.
-                </p>
-              )}
-            </fieldset>
-          </div>
-        </section>
+                    onChange={() => toggleCategory(category.id_categoria)}
+                  />
+                  <span>
+                    {category.nombre}
+                    {category.activo ? "" : " (BAJA)"}
+                  </span>
+                </label>
+              ))
+            ) : (
+              <p className="entity-help">
+                Primero creá una categoría para poder asignarla.
+              </p>
+            )}
+          </fieldset>
+        </EntityFormPanel>
       )}
     </div>
   );
@@ -397,6 +358,7 @@ export default function Socios() {
   const [feedback, setFeedback] = useState(null);
   const [stateModal, setStateModal] = useState(null);
   const [historyModal, setHistoryModal] = useState(null);
+  const [historyTab, setHistoryTab] = useState(INFO_TAB_SUMMARY);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [stateForm, setStateForm] = useState({
     fecha_baja: dateToday(),
@@ -408,6 +370,7 @@ export default function Socios() {
     setModalOpen(true);
   };
   const openHistory = async (item) => {
+    setHistoryTab(INFO_TAB_SUMMARY);
     setHistoryModal({ socio: item, data: null, error: null });
     setHistoryLoading(true);
     try {
@@ -730,7 +693,7 @@ export default function Socios() {
         />
       </CrudModal>
 
-      <CrudModal
+      <InfoModal
         open={Boolean(historyModal)}
         title="Ficha e historial del socio"
         subtitle={
@@ -739,154 +702,267 @@ export default function Socios() {
             : ""
         }
         onClose={() => setHistoryModal(null)}
-        hideSubmit
-        wide
-        modalClassName="socios-modal socios-modal--history"
+        tabs={[
+          { value: INFO_TAB_SUMMARY, label: "Resumen", icon: faCircleInfo },
+          {
+            value: INFO_TAB_ACTIVITY,
+            label: "Actividad",
+            icon: faClockRotateLeft,
+            badge:
+              Number(historyModal?.data?.resumen?.cuotas_pendientes) || null,
+          },
+        ]}
+        activeTab={historyTab}
+        onTabChange={setHistoryTab}
+        loading={historyLoading}
+        loadingTitle="Cargando ficha del socio..."
+        loadingText="Consultando categorías, cuotas e historial."
+        modalClassName="socios-info-modal"
       >
-        {historyLoading ? (
-          <div className="module-empty">
-            <strong>Cargando historial...</strong>
-          </div>
-        ) : historyModal?.error ? (
+        {historyModal?.error ? (
           <ModuleFeedback type="error" message={historyModal.error} />
         ) : historyModal?.data ? (
-          <div className="socio-history">
-            <section className="socio-history__summary">
-              <div>
-                <span>Estado</span>
-                <strong>
-                  {historyModal.data.socio.activo ? "ACTIVO" : "BAJA"}
-                </strong>
+          historyTab === INFO_TAB_SUMMARY ? (
+            <div className="socios-info-content">
+              <InfoSummary
+                items={[
+                  {
+                    label: "Estado",
+                    value:
+                      historyModal.data.socio.activo === true ||
+                      Number(historyModal.data.socio.activo) === 1
+                        ? "ACTIVO"
+                        : "BAJA",
+                    icon:
+                      historyModal.data.socio.activo === true ||
+                      Number(historyModal.data.socio.activo) === 1
+                        ? faCheckCircle
+                        : faUserSlash,
+                    tone:
+                      historyModal.data.socio.activo === true ||
+                      Number(historyModal.data.socio.activo) === 1
+                        ? "success"
+                        : "danger",
+                  },
+                  {
+                    label: "Cuenta",
+                    value:
+                      historyModal.data.resumen.estado_cuenta === "AL_DIA"
+                        ? "AL DÍA"
+                        : "CON DEUDA",
+                    icon: faWallet,
+                    tone:
+                      historyModal.data.resumen.estado_cuenta === "AL_DIA"
+                        ? "success"
+                        : "danger",
+                  },
+                  {
+                    label: "Cuotas pagadas",
+                    value: historyModal.data.resumen.cuotas_pagadas,
+                    icon: faReceipt,
+                  },
+                  {
+                    label: "Pendientes",
+                    value: historyModal.data.resumen.cuotas_pendientes,
+                    icon: faCalendarDays,
+                    tone:
+                      Number(historyModal.data.resumen.cuotas_pendientes) > 0
+                        ? "danger"
+                        : "success",
+                  },
+                ]}
+              />
+              <div className="entity-info-grid">
+                <InfoSection title="Datos personales" icon={faIdCard}>
+                  <InfoRow
+                    title="DNI"
+                    detail={
+                      historyModal.data.socio.dni || historyModal.socio.dni
+                    }
+                  />
+                  <InfoRow
+                    title="Fecha de nacimiento"
+                    detail={formatDate(
+                      historyModal.data.socio.fecha_nacimiento ||
+                        historyModal.socio.fecha_nacimiento,
+                    )}
+                  />
+                  <InfoRow
+                    title="Fecha de ingreso"
+                    detail={formatDate(
+                      historyModal.data.socio.fecha_ingreso ||
+                        historyModal.socio.fecha_ingreso,
+                    )}
+                  />
+                </InfoSection>
+                <InfoSection title="Contacto y ubicación" icon={faHouse}>
+                  <InfoRow
+                    title="Localidad"
+                    detail={
+                      historyModal.data.socio.localidad ||
+                      historyModal.socio.localidad ||
+                      "—"
+                    }
+                  />
+                  <InfoRow
+                    title="Domicilio"
+                    detail={
+                      historyModal.data.socio.domicilio ||
+                      historyModal.socio.domicilio ||
+                      "—"
+                    }
+                  />
+                  <InfoRow
+                    title="Teléfono"
+                    detail={
+                      historyModal.data.socio.telefono ||
+                      historyModal.socio.telefono ||
+                      "—"
+                    }
+                  />
+                  <InfoRow
+                    title="Email"
+                    detail={
+                      historyModal.data.socio.email ||
+                      historyModal.socio.email ||
+                      "—"
+                    }
+                  />
+                </InfoSection>
               </div>
-              <div>
-                <span>Cuenta</span>
-                <strong>
-                  {historyModal.data.resumen.estado_cuenta === "AL_DIA"
-                    ? "AL DÍA"
-                    : "CON DEUDA"}
-                </strong>
-              </div>
-              <div>
-                <span>Cuotas pagadas</span>
-                <strong>{historyModal.data.resumen.cuotas_pagadas}</strong>
-              </div>
-              <div>
-                <span>Cuotas pendientes</span>
-                <strong>{historyModal.data.resumen.cuotas_pendientes}</strong>
-              </div>
-            </section>
-
-            <section className="socio-history__section">
-              <h3>Períodos de actividad</h3>
-              {historyModal.data.periodos.length ? (
-                historyModal.data.periodos.map((periodo) => (
-                  <div className="socio-history__row" key={periodo.id_periodo}>
-                    <strong>
-                      {formatDate(periodo.vigente_desde)} →{" "}
-                      {periodo.vigente_hasta
-                        ? formatDate(periodo.vigente_hasta)
-                        : "ACTUALIDAD"}
-                    </strong>
-                    <span>
-                      {periodo.vigente_hasta
-                        ? periodo.motivo_baja || "PERÍODO CERRADO"
-                        : "PERÍODO ACTIVO"}
-                    </span>
+              <InfoSection
+                title="Categorías actuales"
+                icon={faTags}
+                badge={
+                  historyModal.data.categorias.filter(
+                    (categoria) => !categoria.fecha_hasta,
+                  ).length
+                }
+              >
+                {historyModal.data.categorias.some(
+                  (categoria) => !categoria.fecha_hasta,
+                ) ? (
+                  <div className="entity-info-chips">
+                    {historyModal.data.categorias
+                      .filter((categoria) => !categoria.fecha_hasta)
+                      .map((categoria) => (
+                        <span key={categoria.id_socio_categoria}>
+                          {categoria.categoria}
+                        </span>
+                      ))}
                   </div>
-                ))
-              ) : (
-                <p>Sin períodos registrados.</p>
-              )}
-            </section>
-
-            <section className="socio-history__section">
-              <h3>Historial de categorías</h3>
-              {historyModal.data.categorias.length ? (
-                historyModal.data.categorias.map((categoria) => (
-                  <div
-                    className="socio-history__row"
-                    key={categoria.id_socio_categoria}
-                  >
-                    <strong>{categoria.categoria}</strong>
-                    <span>
-                      {formatDate(categoria.fecha_desde)} →{" "}
-                      {categoria.fecha_hasta
-                        ? formatDate(categoria.fecha_hasta)
-                        : "ACTUALIDAD"}
-                    </span>
+                ) : (
+                  <InfoEmpty>El socio no tiene categorías activas.</InfoEmpty>
+                )}
+              </InfoSection>
+            </div>
+          ) : (
+            <div className="socios-info-content">
+              <div className="entity-info-grid">
+                <InfoSection
+                  title="Períodos de actividad"
+                  icon={faCalendarDays}
+                  badge={historyModal.data.periodos.length}
+                >
+                  {historyModal.data.periodos.length ? (
+                    historyModal.data.periodos.map((periodo) => (
+                      <InfoRow
+                        key={periodo.id_periodo}
+                        title={`${formatDate(periodo.vigente_desde)} → ${periodo.vigente_hasta ? formatDate(periodo.vigente_hasta) : "ACTUALIDAD"}`}
+                        detail={
+                          periodo.vigente_hasta
+                            ? periodo.motivo_baja || "PERÍODO CERRADO"
+                            : "PERÍODO ACTIVO"
+                        }
+                        tone={periodo.vigente_hasta ? "" : "success"}
+                      />
+                    ))
+                  ) : (
+                    <InfoEmpty>Sin períodos registrados.</InfoEmpty>
+                  )}
+                </InfoSection>
+                <InfoSection
+                  title="Historial de categorías"
+                  icon={faTags}
+                  badge={historyModal.data.categorias.length}
+                >
+                  {historyModal.data.categorias.length ? (
+                    historyModal.data.categorias.map((categoria) => (
+                      <InfoRow
+                        key={categoria.id_socio_categoria}
+                        title={categoria.categoria}
+                        detail={`${formatDate(categoria.fecha_desde)} → ${categoria.fecha_hasta ? formatDate(categoria.fecha_hasta) : "ACTUALIDAD"}`}
+                        tone={categoria.fecha_hasta ? "" : "success"}
+                      />
+                    ))
+                  ) : (
+                    <InfoEmpty>Sin categorías registradas.</InfoEmpty>
+                  )}
+                </InfoSection>
+              </div>
+              <InfoSection
+                title="Cuotas pendientes"
+                icon={faCalendarDays}
+                badge={historyModal.data.pendientes.length}
+              >
+                {historyModal.data.pendientes.length ? (
+                  <div className="entity-info-chips">
+                    {historyModal.data.pendientes.map((item) => (
+                      <span
+                        key={`${item.id_categoria}-${item.anio}-${item.id_mes}`}
+                      >
+                        {item.categoria} · {item.mes} {item.anio}
+                      </span>
+                    ))}
                   </div>
-                ))
-              ) : (
-                <p>Sin categorías registradas.</p>
-              )}
-            </section>
-
-            <section className="socio-history__section">
-              <h3>Cuotas pendientes</h3>
-              {historyModal.data.pendientes.length ? (
-                <div className="socio-history__chips">
-                  {historyModal.data.pendientes.map((item) => (
-                    <span
-                      key={`${item.id_categoria}-${item.anio}-${item.id_mes}`}
-                    >
-                      {item.categoria} · {item.mes} {item.anio}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="socio-history__ok">El socio está al día.</p>
-              )}
-            </section>
-
-            <section className="socio-history__section">
-              <h3>Pagos y condonaciones</h3>
-              {historyModal.data.pagos.length ? (
-                historyModal.data.pagos.map((pago) => (
-                  <div className="socio-history__row" key={pago.id_pago}>
-                    <strong>
-                      {pago.categoria} · {pago.mes} {pago.anio}
-                    </strong>
-                    <span>
-                      {pago.estado} · $
-                      {Number(pago.monto).toLocaleString("es-AR", {
+                ) : (
+                  <InfoEmpty tone="success">El socio está al día.</InfoEmpty>
+                )}
+              </InfoSection>
+              <InfoSection
+                title="Pagos y condonaciones"
+                icon={faReceipt}
+                badge={historyModal.data.pagos.length}
+              >
+                {historyModal.data.pagos.length ? (
+                  historyModal.data.pagos.map((pago) => (
+                    <InfoRow
+                      key={pago.id_pago}
+                      title={`${pago.categoria} · ${pago.mes} ${pago.anio}`}
+                      detail={pago.estado}
+                      meta={`$${Number(pago.monto).toLocaleString("es-AR", {
                         minimumFractionDigits: 2,
-                      })}{" "}
-                      · {formatDate(pago.fecha_pago)}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p>Sin cuotas registradas.</p>
-              )}
-            </section>
-
-            <section className="socio-history__section">
-              <h3>Inscripciones</h3>
-              {historyModal.data.inscripciones.length ? (
-                historyModal.data.inscripciones.map((item) => (
-                  <div
-                    className="socio-history__row"
-                    key={item.id_pago_inscripcion}
-                  >
-                    <strong>
-                      {item.categoria} · {item.anio}
-                    </strong>
-                    <span>
-                      {item.estado} · $
-                      {Number(item.monto).toLocaleString("es-AR", {
+                      })} · ${formatDate(pago.fecha_pago)}`}
+                    />
+                  ))
+                ) : (
+                  <InfoEmpty>Sin cuotas registradas.</InfoEmpty>
+                )}
+              </InfoSection>
+              <InfoSection
+                title="Inscripciones"
+                icon={faIdCard}
+                badge={historyModal.data.inscripciones.length}
+              >
+                {historyModal.data.inscripciones.length ? (
+                  historyModal.data.inscripciones.map((item) => (
+                    <InfoRow
+                      key={item.id_pago_inscripcion}
+                      title={`${item.categoria} · ${item.anio}`}
+                      detail={item.estado}
+                      meta={`$${Number(item.monto).toLocaleString("es-AR", {
                         minimumFractionDigits: 2,
-                      })}{" "}
-                      · {formatDate(item.fecha_pago)}
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <p>Sin inscripciones registradas.</p>
-              )}
-            </section>
-          </div>
+                      })} · ${formatDate(item.fecha_pago)}`}
+                    />
+                  ))
+                ) : (
+                  <InfoEmpty>Sin inscripciones registradas.</InfoEmpty>
+                )}
+              </InfoSection>
+            </div>
+          )
         ) : null}
-      </CrudModal>
+      </InfoModal>
 
       <ModalEliminarGlobal
         open={Boolean(stateModal)}

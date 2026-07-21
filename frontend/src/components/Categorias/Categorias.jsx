@@ -1,21 +1,38 @@
 import React, { useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faCalendarDays,
+  faCheckCircle,
   faClockRotateLeft,
   faPen,
   faRotateLeft,
+  faTags,
   faToggleOff,
   faTrashCan,
+  faUsers,
+  faWallet,
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../Global/components/ModulePage";
 import CrudModal from "../Global/components/CrudModal";
+import InfoModal, {
+  InfoEmpty,
+  InfoRow,
+  InfoSection,
+  InfoSummary,
+} from "../Global/components/InfoModal";
 import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../Global/components/ModuleFeedback";
+import {
+  EntityFormPanel,
+  EntityTabs,
+  FloatingField,
+} from "../Global/components/TabbedForm";
 import { canWrite } from "../Global/auth/session";
 import { categoriasApi } from "./api/categoriasApi";
 import { useCategorias } from "./hooks/useCategorias";
 import { useDescuentosFamiliares } from "./hooks/useDescuentosFamiliares";
 import "./Categorias.css";
+import "./CategoriasModal.css";
 
 const dateToday = () => {
   const now = new Date();
@@ -25,6 +42,8 @@ const dateToday = () => {
 };
 
 const upper = (value) => value.toLocaleUpperCase("es-AR");
+const CATEGORY_TAB_GENERAL = "general";
+const CATEGORY_TAB_PRICE = "price";
 const money = (value) =>
   new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(
     Number(value || 0),
@@ -53,74 +72,118 @@ const emptyDiscountForm = () => ({
   porcentaje_descuento: "",
 });
 
-function CategoryForm({ form, setForm }) {
+function CategoryForm({ form, setForm, activeTab, onTabChange }) {
   const update = (key, value) =>
     setForm((current) => ({ ...current, [key]: value }));
   return (
-    <div className="entity-form">
-      <div className="entity-form__grid">
-        <label className="entity-field">
-          <span>Nombre *</span>
-          <input
-            value={form.nombre}
-            onChange={(event) => update("nombre", upper(event.target.value))}
-            required
-            maxLength={120}
-          />
-        </label>
-        <label className="entity-field">
-          <span>Monto mensual *</span>
-          <input
-            type="number"
-            min="0"
-            max="9999999999.99"
-            step="0.01"
-            value={form.monto_actual}
-            onChange={(event) => update("monto_actual", event.target.value)}
-            required
-          />
-        </label>
-        <label className="entity-field entity-field--wide">
-          <span>Descripción</span>
-          <textarea
-            value={form.descripcion}
-            onChange={(event) =>
-              update("descripcion", upper(event.target.value))
-            }
-            rows={3}
-            maxLength={500}
-          />
-        </label>
-        <label className="entity-field">
-          <span>Vigente desde *</span>
-          <input
-            type="date"
-            value={form.vigente_desde}
-            max={dateToday()}
-            onChange={(event) => update("vigente_desde", event.target.value)}
-            required
-          />
-        </label>
-        <label className="entity-field">
-          <span>Motivo del precio</span>
-          <input
-            value={form.motivo_precio}
-            onChange={(event) =>
-              update("motivo_precio", upper(event.target.value))
-            }
-            maxLength={255}
-            placeholder={
-              form.id_categoria
-                ? "EJ.: ACTUALIZACIÓN DE CUOTA"
-                : "PRECIO INICIAL"
-            }
-          />
-        </label>
-      </div>
-      <p className="entity-help">
-        La categoría tiene un único precio mensual. Los períodos de 6 y 12 meses
-        se calculan automáticamente desde este importe.
-      </p>
+    <div className="entity-form categorias-modal__form">
+      <EntityTabs
+        tabs={[
+          {
+            value: CATEGORY_TAB_GENERAL,
+            label: "Datos generales",
+            icon: faTags,
+          },
+          {
+            value: CATEGORY_TAB_PRICE,
+            label: "Precio y vigencia",
+            icon: faWallet,
+          },
+        ]}
+        value={activeTab}
+        onChange={onTabChange}
+        idPrefix="categoria-form-tab"
+        ariaLabel="Secciones de la categoría"
+      />
+
+      {activeTab === CATEGORY_TAB_GENERAL ? (
+        <EntityFormPanel
+          tabValue={CATEGORY_TAB_GENERAL}
+          idPrefix="categoria-form-tab"
+          eyebrow="Identificación"
+          title="Datos generales de la categoría"
+          icon={faTags}
+          tag="Paso 1 de 2"
+          bodyClassName="entity-form__grid entity-form__grid--single"
+          hint="Definí un nombre claro y una descripción breve para identificar la categoría en socios, cuotas y reportes."
+        >
+          <FloatingField label="Nombre *" active={Boolean(form.nombre)}>
+            <input
+              value={form.nombre}
+              placeholder=" "
+              onChange={(event) => update("nombre", upper(event.target.value))}
+              required
+              maxLength={120}
+              autoFocus
+            />
+          </FloatingField>
+          <FloatingField
+            label="Descripción"
+            active={Boolean(form.descripcion)}
+            textarea
+          >
+            <textarea
+              value={form.descripcion}
+              placeholder=" "
+              onChange={(event) =>
+                update("descripcion", upper(event.target.value))
+              }
+              rows={3}
+              maxLength={500}
+            />
+          </FloatingField>
+        </EntityFormPanel>
+      ) : (
+        <EntityFormPanel
+          tabValue={CATEGORY_TAB_PRICE}
+          idPrefix="categoria-form-tab"
+          eyebrow="Configuración económica"
+          title="Precio mensual y vigencia"
+          icon={faWallet}
+          tag={form.id_categoria ? "Actualización" : "Precio inicial"}
+          bodyClassName="entity-form__grid categorias-price-panel__body"
+          hint="Los importes semestrales y anuales se calculan automáticamente a partir del monto mensual."
+        >
+          <FloatingField
+            label="Monto mensual *"
+            active={form.monto_actual !== ""}
+          >
+            <input
+              type="number"
+              placeholder=" "
+              min="0"
+              max="9999999999.99"
+              step="0.01"
+              value={form.monto_actual}
+              onChange={(event) => update("monto_actual", event.target.value)}
+              required
+            />
+          </FloatingField>
+          <FloatingField label="Vigente desde *" active>
+            <input
+              type="date"
+              value={form.vigente_desde}
+              max={dateToday()}
+              onChange={(event) => update("vigente_desde", event.target.value)}
+              required
+            />
+          </FloatingField>
+          <FloatingField
+            label="Motivo del precio"
+            active={Boolean(form.motivo_precio)}
+            wide
+          >
+            <input
+              value={form.motivo_precio}
+              placeholder=" "
+              onChange={(event) =>
+                update("motivo_precio", upper(event.target.value))
+              }
+              maxLength={255}
+            />
+          </FloatingField>
+        </EntityFormPanel>
+      )}
     </div>
   );
 }
@@ -129,12 +192,21 @@ function DiscountForm({ form, setForm }) {
   const update = (key, value) =>
     setForm((current) => ({ ...current, [key]: value }));
   return (
-    <div className="entity-form">
-      <div className="entity-form__grid entity-form__grid--single">
-        <label className="entity-field">
-          <span>Cantidad mínima de integrantes *</span>
+    <div className="entity-form categorias-discount-form">
+      <EntityFormPanel
+        tabValue="discount-rule"
+        eyebrow="Regla global"
+        title="Umbral y porcentaje"
+        icon={faUsers}
+        tag="Descuento familiar"
+        standalone
+        bodyClassName="entity-form__grid entity-form__grid--single categorias-discount-panel__body"
+        hint="La regla se aplica desde esa cantidad hasta el siguiente umbral. El porcentaje es global y no depende de una categoría."
+      >
+        <FloatingField label="Cantidad mínima de integrantes *" active>
           <input
             type="number"
+            placeholder=" "
             min="2"
             max="50"
             step="1"
@@ -144,11 +216,14 @@ function DiscountForm({ form, setForm }) {
             }
             required
           />
-        </label>
-        <label className="entity-field">
-          <span>Porcentaje de descuento *</span>
+        </FloatingField>
+        <FloatingField
+          label="Porcentaje de descuento *"
+          active={form.porcentaje_descuento !== ""}
+        >
           <input
             type="number"
+            placeholder=" "
             min="0.01"
             max="100"
             step="0.01"
@@ -158,12 +233,8 @@ function DiscountForm({ form, setForm }) {
             }
             required
           />
-        </label>
-      </div>
-      <p className="entity-help">
-        La regla se aplica desde esa cantidad hasta el siguiente umbral
-        configurado. El porcentaje es global: no depende de una categoría.
-      </p>
+        </FloatingField>
+      </EntityFormPanel>
     </div>
   );
 }
@@ -186,6 +257,7 @@ export default function Categorias() {
   } = useDescuentosFamiliares();
 
   const [categoryForm, setCategoryForm] = useState(emptyCategoryForm());
+  const [categoryFormTab, setCategoryFormTab] = useState(CATEGORY_TAB_GENERAL);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [discountForm, setDiscountForm] = useState(emptyDiscountForm());
   const [discountModalOpen, setDiscountModalOpen] = useState(false);
@@ -199,6 +271,7 @@ export default function Categorias() {
 
   const openNewCategory = () => {
     setCategoryForm(emptyCategoryForm());
+    setCategoryFormTab(CATEGORY_TAB_GENERAL);
     setCategoryModalOpen(true);
   };
 
@@ -211,6 +284,7 @@ export default function Categorias() {
       vigente_desde: dateToday(),
       motivo_precio: "",
     });
+    setCategoryFormTab(CATEGORY_TAB_GENERAL);
     setCategoryModalOpen(true);
   };
 
@@ -230,6 +304,35 @@ export default function Categorias() {
 
   const saveCategory = async (event) => {
     event.preventDefault();
+
+    if (!categoryForm.nombre.trim()) {
+      setCategoryFormTab(CATEGORY_TAB_GENERAL);
+      setFeedback({
+        type: "error",
+        message: "Completá el nombre de la categoría.",
+      });
+      return;
+    }
+    if (
+      categoryForm.monto_actual === "" ||
+      Number(categoryForm.monto_actual) < 0
+    ) {
+      setCategoryFormTab(CATEGORY_TAB_PRICE);
+      setFeedback({
+        type: "error",
+        message: "Ingresá un monto mensual válido.",
+      });
+      return;
+    }
+    if (!categoryForm.vigente_desde) {
+      setCategoryFormTab(CATEGORY_TAB_PRICE);
+      setFeedback({
+        type: "error",
+        message: "Seleccioná desde cuándo estará vigente el precio.",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const response = await categoriasApi.guardar(categoryForm);
@@ -294,6 +397,8 @@ export default function Categorias() {
 
   const activeError = section === "categorias" ? error : discountsError;
   const activeLoading = section === "categorias" ? loading : discountsLoading;
+  const historyIsActive =
+    historyModal?.activo === true || Number(historyModal?.activo) === 1;
   const primaryAction =
     section === "categorias" ? openNewCategory : openNewDiscount;
   const primaryLabel =
@@ -591,9 +696,15 @@ export default function Categorias() {
         submitLabel={
           categoryForm.id_categoria ? "Guardar cambios" : "Crear categoría"
         }
+        modalClassName="categorias-modal categorias-modal--form"
         wide
       >
-        <CategoryForm form={categoryForm} setForm={setCategoryForm} />
+        <CategoryForm
+          form={categoryForm}
+          setForm={setCategoryForm}
+          activeTab={categoryFormTab}
+          onTabChange={setCategoryFormTab}
+        />
       </CrudModal>
 
       <CrudModal
@@ -612,6 +723,7 @@ export default function Categorias() {
             ? "Guardar cambios"
             : "Crear descuento"
         }
+        modalClassName="categorias-modal categorias-modal--discount"
       >
         <DiscountForm form={discountForm} setForm={setDiscountForm} />
       </CrudModal>
@@ -706,46 +818,65 @@ export default function Categorias() {
         errorMessage="No se pudo eliminar el descuento familiar."
       />
 
-      <CrudModal
+      <InfoModal
         open={Boolean(historyModal)}
         title="Historial de precios"
         subtitle={historyModal?.nombre || ""}
         onClose={() => setHistoryModal(null)}
-        onSubmit={(event) => {
-          event.preventDefault();
-          setHistoryModal(null);
-        }}
-        submitLabel="Cerrar"
+        loading={historyLoading}
+        loadingTitle="Cargando historial de precios..."
+        loadingText="Consultando importes, vigencias y motivos de actualización."
+        modalClassName="categorias-info-modal"
       >
-        {historyLoading ? (
-          <p className="entity-confirm-text">Cargando historial...</p>
-        ) : (
-          <div className="entity-history">
+        <div className="categorias-info-content">
+          <InfoSummary
+            items={[
+              {
+                label: "Estado",
+                value: historyIsActive ? "ACTIVA" : "BAJA",
+                icon: historyIsActive ? faCheckCircle : faToggleOff,
+                tone: historyIsActive ? "success" : "danger",
+              },
+              {
+                label: "Precio actual",
+                value: money(historyModal?.monto_actual),
+                icon: faWallet,
+              },
+              {
+                label: "Socios",
+                value: historyModal?.cantidad_socios || 0,
+                icon: faUsers,
+              },
+              {
+                label: "Cambios registrados",
+                value: history.length,
+                icon: faClockRotateLeft,
+              },
+            ]}
+          />
+          <InfoSection
+            title="Evolución del precio mensual"
+            icon={faCalendarDays}
+            badge={history.length}
+          >
             {history.map((entry) => (
-              <article key={entry.id_historial}>
-                <div>
-                  <strong>{money(entry.monto_nuevo)}</strong>
-                  <span>
-                    {formatDate(entry.vigente_desde)} —{" "}
-                    {formatDate(entry.vigente_hasta)}
-                  </span>
-                </div>
-                <p>{entry.motivo || "SIN MOTIVO"}</p>
-                {entry.monto_anterior !== null ? (
-                  <small>Anterior: {money(entry.monto_anterior)}</small>
-                ) : (
-                  <small>Precio inicial</small>
-                )}
-              </article>
+              <InfoRow
+                key={entry.id_historial}
+                title={money(entry.monto_nuevo)}
+                detail={`${formatDate(entry.vigente_desde)} → ${formatDate(entry.vigente_hasta)} · ${entry.motivo || "SIN MOTIVO"}`}
+                meta={
+                  entry.monto_anterior !== null
+                    ? `Anterior: ${money(entry.monto_anterior)}`
+                    : "Precio inicial"
+                }
+              />
             ))}
             {!history.length ? (
-              <p className="entity-help">
-                No hay precios históricos registrados.
-              </p>
+              <InfoEmpty>No hay precios históricos registrados.</InfoEmpty>
             ) : null}
-          </div>
-        )}
-      </CrudModal>
+          </InfoSection>
+        </div>
+      </InfoModal>
     </>
   );
 }

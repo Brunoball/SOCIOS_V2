@@ -80,7 +80,7 @@ function ModuleFilter({ filter }) {
 
   return (
     <label
-      className={`module-filter module-filter--${filter.type || "search"} ${active ? "is-active" : ""}`}
+      className={`module-filter module-filter--${filter.type || "search"} ${active ? "is-active" : ""} ${filter.className || ""}`.trim()}
     >
       {filter.type === "select" ? (
         <select
@@ -143,6 +143,8 @@ export function ModulePage({
   onPrimaryAction,
   onRefresh,
   secondaryActions = [],
+  primaryActionClassName = "",
+  headFiltersClassName = "",
   canCreate = true,
   refreshing = false,
   tabsInTitle = false,
@@ -190,7 +192,9 @@ export function ModulePage({
             </div>
 
             {headerFilters.length ? (
-              <div className="mov-headFilters module-headFilters">
+              <div
+                className={`mov-headFilters module-headFilters ${headFiltersClassName}`.trim()}
+              >
                 {headerFilters.map((filter) => (
                   <ModuleFilter
                     filter={filter}
@@ -229,7 +233,7 @@ export function ModulePage({
             {canCreate ? (
               <button
                 type="button"
-                className="mov-btn mov-btn--primary"
+                className={`mov-btn mov-btn--primary ${primaryActionClassName}`.trim()}
                 onClick={onPrimaryAction}
                 disabled={!onPrimaryAction}
               >
