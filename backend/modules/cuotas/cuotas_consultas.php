@@ -246,10 +246,11 @@ abstract class CuotasConsultas extends CuotasSoporte
         ?string $selectedModality = null
     ): array
     {
-        $rows = array_merge(
+        $allRows = array_merge(
             self::paymentRows($db, $status),
             self::registrationRows($db, $status)
         );
+        $rows = $allRows;
 
         // El filtro se aplica sobre las líneas antes de agrupar. Los paquetes
         // semestrales/anuales se conservan completos cuando incluyen el mes
@@ -300,6 +301,30 @@ abstract class CuotasConsultas extends CuotasSoporte
                 return true;
             }
         ));
+
+        // Cuotas e inscripción registradas desde el mismo modal comparten un
+        // código COB-* y forman un único cobro atómico. Si cualquier línea
+        // coincide con los filtros, se recuperan también las demás líneas de
+        // ese cobro para mostrar el total real y evitar anulaciones parciales.
+        $matchedKeys = [];
+        $combinedCodes = [];
+        foreach ($rows as $row) {
+            $matchedKeys[$row['tipo_registro'] . '-' . $row['id_linea']] = true;
+            $rowCode = (string)$row['codigo_operacion'];
+            if (preg_match('/^(?:COND-)?COB-/', $rowCode) === 1) {
+                $combinedCodes[$rowCode] = true;
+            }
+        }
+        if ($combinedCodes !== []) {
+            $rows = array_values(array_filter(
+                $allRows,
+                static function (array $row) use ($matchedKeys, $combinedCodes): bool {
+                    $key = $row['tipo_registro'] . '-' . $row['id_linea'];
+                    return isset($matchedKeys[$key])
+                        || isset($combinedCodes[(string)$row['codigo_operacion']]);
+                }
+            ));
+        }
 
         $operations = self::groupOperations($rows, true);
         if ($selectedMonth !== null) {
@@ -922,9 +947,16 @@ abstract class CuotasConsultas extends CuotasSoporte
             $modalityDiscounts = array_values($operation['descuentos_modalidad_map']);
             $modalityCodes = array_keys($operation['modalidades_map']);
             $modalityNames = array_values($operation['modalidades_map']);
-            $modalityCode = count($modalityCodes) === 1 ? $modalityCodes[0] : 'VARIAS';
-            $modalityLabel = count($modalityNames) === 1 ? $modalityNames[0] : 'VARIAS MODALIDADES';
-            $isPackage = count($modalityCodes) === 1 && self::isPackageModality($modalityCode);
+            $isCombined = preg_match('/^(?:COND-)?COB-/', (string)$operation['codigo_operacion']) === 1;
+            $modalityCode = $isCombined
+                ? 'COBRO_COMBINADO'
+                : (count($modalityCodes) === 1 ? $modalityCodes[0] : 'VARIAS');
+            $modalityLabel = $isCombined
+                ? 'CUOTAS + INSCRIPCIÓN'
+                : (count($modalityNames) === 1 ? $modalityNames[0] : 'VARIAS MODALIDADES');
+            $isPackage = !$isCombined
+                && count($modalityCodes) === 1
+                && self::isPackageModality($modalityCode);
             $years = array_values(array_unique(array_column($operation['lineas'], 'anio')));
 
             if ($isPackage && count($years) === 1) {
@@ -958,7 +990,8 @@ abstract class CuotasConsultas extends CuotasSoporte
                 'modalidad_codigo' => $modalityCode,
                 'modalidad_label' => $modalityLabel,
                 'es_paquete' => $isPackage,
-                'eliminacion_atomica' => $isPackage,
+                'eliminacion_atomica' => $isPackage || $isCombined,
+                'cobro_combinado' => $isCombined,
                 'estado' => $operation['estado'],
                 'fecha_pago' => $operation['fecha_pago'],
                 'medio_pago' => $operation['medio_pago'],

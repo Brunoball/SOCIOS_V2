@@ -112,6 +112,7 @@ function excelDownload(filename, headers, rows) {
 const emptyPaymentForm = () => ({
   modalidad: "MENSUAL",
   aplicar_familia: false,
+  incluir_inscripcion: false,
   id_categoria: "",
   anio: String(currentYear),
   seleccion: {},
@@ -153,6 +154,7 @@ export default function Cuotas() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedPartner, setPickedPartner] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentConcept, setPaymentConcept] = useState("CUOTAS");
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentDetail, setPaymentDetail] = useState(null);
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm());
@@ -186,6 +188,7 @@ export default function Cuotas() {
   ) => {
     setPickerOpen(false);
     setPaymentOpen(true);
+    setPaymentConcept("CUOTAS");
     setPaymentLoading(true);
     setPaymentDetail(null);
     setFeedback(null);
@@ -234,6 +237,7 @@ export default function Cuotas() {
       anio: value,
       modalidad: "MENSUAL",
       seleccion: {},
+      incluir_inscripcion: false,
       descripcion_inscripcion: `INSCRIPCIÓN ${value}`,
     }));
   };
@@ -247,6 +251,7 @@ export default function Cuotas() {
       id_categoria: value,
       modalidad: "MENSUAL",
       seleccion: {},
+      incluir_inscripcion: false,
     }));
 
   const changeFamilyScope = (checked) => {
@@ -283,6 +288,7 @@ export default function Cuotas() {
         aplicar_familia: checked,
         modalidad: "MENSUAL",
         seleccion: selection,
+        incluir_inscripcion: false,
       };
     });
   };
@@ -446,18 +452,50 @@ export default function Cuotas() {
     [availableModalities],
   );
 
+  const feeModalities = useMemo(
+    () =>
+      availableModalities.filter((item) => item.codigo !== "INSCRIPCION"),
+    [availableModalities],
+  );
+  const feeModalityCodes = useMemo(
+    () => feeModalities.map((item) => item.codigo),
+    [feeModalities],
+  );
+  const registrationAvailable = availableModalityCodes.includes("INSCRIPCION");
+
   useEffect(() => {
-    if (!paymentDetail || !availableModalityCodes.length) return;
-    if (availableModalityCodes.includes(paymentForm.modalidad)) return;
-    const fallback = availableModalityCodes.includes("MENSUAL")
+    if (!paymentDetail || !feeModalityCodes.length) return;
+    if (feeModalityCodes.includes(paymentForm.modalidad)) return;
+    const fallback = feeModalityCodes.includes("MENSUAL")
       ? "MENSUAL"
-      : availableModalityCodes[0];
+      : feeModalityCodes[0];
     setPaymentForm((current) => ({
       ...current,
       modalidad: fallback,
       seleccion: {},
     }));
-  }, [paymentDetail, availableModalityCodes, paymentForm.modalidad]);
+  }, [paymentDetail, feeModalityCodes, paymentForm.modalidad]);
+
+  useEffect(() => {
+    if (!paymentDetail) return;
+    if (paymentConcept === "CUOTAS" && !feeModalities.length && registrationAvailable) {
+      setPaymentConcept("INSCRIPCION");
+    } else if (
+      paymentConcept === "INSCRIPCION" &&
+      !registrationAvailable &&
+      feeModalities.length
+    ) {
+      setPaymentConcept("CUOTAS");
+    }
+  }, [paymentDetail, paymentConcept, feeModalities.length, registrationAvailable]);
+
+  useEffect(() => {
+    if (registrationAvailable || !paymentForm.incluir_inscripcion) return;
+    setPaymentForm((current) => ({
+      ...current,
+      incluir_inscripcion: false,
+    }));
+  }, [registrationAvailable, paymentForm.incluir_inscripcion]);
 
   const changePaymentModality = (code) => {
     const months = PACKAGE_MODALITY_MONTHS[code] || [];
@@ -480,14 +518,8 @@ export default function Cuotas() {
     }));
   };
 
-  const isRegistrationMode = paymentForm.modalidad === "INSCRIPCION";
+  const isRegistrationMode = paymentConcept === "INSCRIPCION";
   const isPackageMode = Boolean(PACKAGE_MODALITY_MONTHS[paymentForm.modalidad]);
-  const feeModalities = useMemo(
-    () =>
-      availableModalities.filter((item) => item.codigo !== "INSCRIPCION"),
-    [availableModalities],
-  );
-  const registrationAvailable = availableModalityCodes.includes("INSCRIPCION");
   const pendingRegistrationRecipients = useMemo(
     () =>
       registrationRecipients.filter((member) => member.estado === "PENDIENTE"),
@@ -505,25 +537,25 @@ export default function Cuotas() {
       paymentDetail?.familia?.porcentaje_descuento,
     ],
   );
+  const includedRegistrationTotal = paymentForm.incluir_inscripcion
+    ? registrationTotal
+    : 0;
   const paymentTotal = paymentForm.condonado
     ? 0
-    : isRegistrationMode
-      ? registrationTotal
-      : totals.final;
-  const hasPaymentSelection = isRegistrationMode
-    ? pendingRegistrationRecipients.length > 0
-    : selectedPeriods.length > 0;
+    : totals.final + includedRegistrationTotal;
+  const hasPaymentSelection =
+    selectedPeriods.length > 0 ||
+    (paymentForm.incluir_inscripcion &&
+      pendingRegistrationRecipients.length > 0);
 
   const changePaymentConcept = (concept) => {
-    if (concept === "INSCRIPCION") {
-      if (registrationAvailable) changePaymentModality("INSCRIPCION");
+    if (concept === "INSCRIPCION" && registrationAvailable) {
+      setPaymentConcept("INSCRIPCION");
       return;
     }
-
-    const fallback = feeModalities.some((item) => item.codigo === "MENSUAL")
-      ? "MENSUAL"
-      : feeModalities[0]?.codigo;
-    if (fallback) changePaymentModality(fallback);
+    if (concept === "CUOTAS" && feeModalities.length) {
+      setPaymentConcept("CUOTAS");
+    }
   };
 
   const savePayment = async (event) => {
@@ -531,54 +563,40 @@ export default function Cuotas() {
     if (!paymentDetail) return;
     setSaving(true);
     try {
-      let response;
-      if (!isRegistrationMode) {
-        if (!selectedPeriods.length)
-          throw new Error("Seleccioná al menos un mes pendiente.");
-        response = await cuotasApi.registrarPago({
-          id_socio: paymentDetail.socio.id_socio,
-          aplicar_familia: paymentForm.aplicar_familia,
-          modalidad: paymentForm.modalidad,
-          obligaciones: selectedPeriods.map(
-            ({ id_socio, id_categoria, anio, id_mes }) => ({
-              id_socio,
-              id_categoria,
-              anio,
-              id_mes,
-            }),
-          ),
-          id_medio_pago: paymentForm.id_medio_pago,
-          fecha_pago: paymentForm.fecha_pago,
-          condonado: paymentForm.condonado,
-          motivo_condonacion: paymentForm.motivo_condonacion,
-          observaciones: paymentForm.observaciones,
-        });
-      } else {
-        if (!registrationRecipients.length)
-          throw new Error(
-            "No hay integrantes con esa categoría para registrar la inscripción.",
-          );
-        if (
-          registrationRecipients.every(
-            (member) => member.estado !== "PENDIENTE",
-          )
-        )
-          throw new Error(
-            "La inscripción ya está registrada para todos los integrantes seleccionados.",
-          );
-        response = await cuotasApi.registrarInscripcion({
-          id_socio: paymentDetail.socio.id_socio,
-          aplicar_familia: paymentForm.aplicar_familia,
-          id_categoria: paymentForm.id_categoria,
-          anio: paymentForm.anio,
-          descripcion: paymentForm.descripcion_inscripcion,
-          id_medio_pago: paymentForm.id_medio_pago,
-          fecha_pago: paymentForm.fecha_pago,
-          condonado: paymentForm.condonado,
-          motivo_condonacion: paymentForm.motivo_condonacion,
-          observaciones: paymentForm.observaciones,
-        });
+      if (!selectedPeriods.length && !paymentForm.incluir_inscripcion) {
+        throw new Error("Seleccioná al menos una cuota o incluí la inscripción.");
       }
+      if (
+        paymentForm.incluir_inscripcion &&
+        !pendingRegistrationRecipients.length
+      ) {
+        throw new Error(
+          "La inscripción ya está registrada para todos los integrantes seleccionados.",
+        );
+      }
+
+      const response = await cuotasApi.registrarCobro({
+        id_socio: paymentDetail.socio.id_socio,
+        aplicar_familia: paymentForm.aplicar_familia,
+        modalidad: paymentForm.modalidad,
+        obligaciones: selectedPeriods.map(
+          ({ id_socio, id_categoria, anio, id_mes }) => ({
+            id_socio,
+            id_categoria,
+            anio,
+            id_mes,
+          }),
+        ),
+        incluir_inscripcion: paymentForm.incluir_inscripcion,
+        id_categoria: paymentForm.id_categoria,
+        anio: paymentForm.anio,
+        descripcion: paymentForm.descripcion_inscripcion,
+        id_medio_pago: paymentForm.id_medio_pago,
+        fecha_pago: paymentForm.fecha_pago,
+        condonado: paymentForm.condonado,
+        motivo_condonacion: paymentForm.motivo_condonacion,
+        observaciones: paymentForm.observaciones,
+      });
       setPaymentOpen(false);
       setFeedback({
         type: "success",
@@ -1243,6 +1261,9 @@ export default function Cuotas() {
                 disabled={!feeModalities.length}
               >
                 Cuotas
+                {selectedPeriods.length ? (
+                  <small>{selectedPeriods.length}</small>
+                ) : null}
               </button>
               <button
                 type="button"
@@ -1253,6 +1274,7 @@ export default function Cuotas() {
                 disabled={!registrationAvailable}
               >
                 Inscripción
+                {paymentForm.incluir_inscripcion ? <small>✓</small> : null}
               </button>
             </div>
 
@@ -1385,21 +1407,44 @@ export default function Cuotas() {
                 </>
               ) : (
                 <div className="cuotas-registration-box">
-                  <div className="cuotas-registration-amount">
-                    <span>Importe por integrante</span>
-                    <strong>{money(paymentForm.monto_inscripcion)}</strong>
-                  </div>
+                  <label
+                    className={`cuotas-registration-choice ${paymentForm.incluir_inscripcion ? "is-selected" : ""} ${!pendingRegistrationRecipients.length ? "is-disabled" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={paymentForm.incluir_inscripcion}
+                      onChange={(event) =>
+                        updateForm("incluir_inscripcion", event.target.checked)
+                      }
+                      disabled={!pendingRegistrationRecipients.length}
+                    />
+                    <div>
+                      <span>Incluir inscripción en este pago</span>
+                      <strong>{money(registrationTotal)}</strong>
+                      <small>
+                        {pendingRegistrationRecipients.length} integrante
+                        {pendingRegistrationRecipients.length === 1 ? "" : "s"}
+                      </small>
+                    </div>
+                  </label>
                   <div className="cuotas-registration-members">
-                    {registrationRecipients.map((member) => (
-                      <article key={member.id_socio}>
-                        <strong>{member.socio}</strong>
-                        <span
-                          className={`mov-chip ${member.estado === "PENDIENTE" ? "" : member.estado === "PAGADO" ? "mov-chip--ok" : "mov-chip--danger"}`}
-                        >
-                          {member.estado}
-                        </span>
-                      </article>
-                    ))}
+                    {registrationRecipients.map((member) => {
+                      const pending = member.estado === "PENDIENTE";
+                      const status =
+                        pending && paymentForm.incluir_inscripcion
+                          ? "INCLUIDA"
+                          : member.estado;
+                      return (
+                        <article key={member.id_socio}>
+                          <strong>{member.socio}</strong>
+                          <span
+                            className={`mov-chip ${status === "INCLUIDA" || status === "PAGADO" ? "mov-chip--ok" : status === "CONDONADO" ? "mov-chip--danger" : ""}`}
+                          >
+                            {status}
+                          </span>
+                        </article>
+                      );
+                    })}
                     {!registrationRecipients.length ? (
                       <p className="entity-help">
                         Ningún integrante seleccionado tiene esta categoría en
@@ -1490,9 +1535,11 @@ export default function Cuotas() {
             : "Eliminar pago"
         }
         message={
-          deleteModal?.es_paquete
-            ? "Se anulará el paquete completo y todos sus períodos volverán a quedar pendientes."
-            : "Se anularán las líneas incluidas en esta operación y los períodos volverán a quedar pendientes."
+          deleteModal?.cobro_combinado
+            ? "Se anularán juntas las cuotas y la inscripción incluidas en este cobro."
+            : deleteModal?.es_paquete
+              ? "Se anulará el paquete completo y todos sus períodos volverán a quedar pendientes."
+              : "Se anularán las líneas incluidas en esta operación y los períodos volverán a quedar pendientes."
         }
         warning="La auditoría de la operación se conservará."
         details={
@@ -1534,7 +1581,15 @@ export default function Cuotas() {
             : "No se pudo eliminar el pago."
         }
         extraContent={
-          deleteModal?.es_paquete ? (
+          deleteModal?.cobro_combinado ? (
+            <div className="cuotas-delete-package-warning">
+              <strong>Este pago incluye cuotas e inscripción.</strong>
+              <p className="entity-confirm-text">
+                La operación es única: al eliminarla volverán a quedar
+                pendientes tanto la inscripción como los meses cobrados.
+              </p>
+            </div>
+          ) : deleteModal?.es_paquete ? (
             <div className="cuotas-delete-package-warning">
               <strong>
                 Este registro corresponde a {deleteModal.modalidad_label}.

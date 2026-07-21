@@ -137,7 +137,7 @@ final class Usuarios
             $role,
             $password
         ): array {
-            self::assertUniqueUsername($master, (int)$auth['id_tenant'], $username, $id);
+            self::assertUniqueUsername($master, $username, $id);
             self::assertUniqueEmail($master, $schema, (int)$auth['id_tenant'], $email, $id);
 
             if ($id === null) {
@@ -433,10 +433,13 @@ final class Usuarios
         }
     }
 
-    private static function assertUniqueUsername(PDO $master, int $tenantId, string $username, ?int $excludeId): void
+    private static function assertUniqueUsername(PDO $master, string $username, ?int $excludeId): void
     {
-        $sql = 'SELECT idUsuarioMaster FROM usuarios_master WHERE idTenant = ? AND usuario = ?';
-        $params = [$tenantId, $username];
+        // El login público utiliza únicamente usuario y contraseña. Por eso el
+        // nombre de usuario debe ser único en toda la base maestra, no solo
+        // dentro de un tenant.
+        $sql = 'SELECT idUsuarioMaster FROM usuarios_master WHERE usuario = ?';
+        $params = [$username];
         if ($excludeId !== null) {
             $sql .= ' AND idUsuarioMaster <> ?';
             $params[] = $excludeId;
@@ -445,7 +448,7 @@ final class Usuarios
         $statement = $master->prepare($sql);
         $statement->execute($params);
         if ($statement->fetchColumn()) {
-            api_error('Ya existe un usuario con ese nombre en la organización.', 'USUARIO_DUPLICADO', 409);
+            api_error('Ya existe un usuario con ese nombre en el sistema.', 'USUARIO_DUPLICADO', 409);
         }
     }
 
