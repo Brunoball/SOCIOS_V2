@@ -8,7 +8,6 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../Global/components/ModulePage";
 import CrudModal from "../Global/components/CrudModal";
-import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../Global/components/ModuleFeedback";
 import { canWrite } from "../Global/auth/session";
 import { cuotasApi } from "./api/cuotasApi";
@@ -136,7 +135,7 @@ export default function Cuotas() {
       buscar: search,
       categoria: category,
       anio: year,
-      mes: month,
+      mes: tab !== "deudores" && modality === "INSCRIPCION" ? "" : month,
       modalidad: tab === "deudores" ? "" : modality,
     }),
     [tab, search, category, year, month, modality],
@@ -267,7 +266,8 @@ export default function Cuotas() {
           String(period.id_categoria) === String(current.id_categoria) &&
           String(period.anio) === String(current.anio) &&
           (checked ||
-            Number(period.id_socio) === Number(paymentDetail.socio.id_socio));
+            Number(period.id_socio) ===
+              Number(paymentDetail.socio.id_socio));
         if (
           isVisible &&
           period.estado === "PENDIENTE" &&
@@ -319,7 +319,8 @@ export default function Cuotas() {
     () =>
       visiblePeriods.filter(
         (period) =>
-          paymentForm.seleccion[period.clave] && period.estado === "PENDIENTE",
+          paymentForm.seleccion[period.clave] &&
+          period.estado === "PENDIENTE",
       ),
     [visiblePeriods, paymentForm.seleccion],
   );
@@ -456,7 +457,12 @@ export default function Cuotas() {
         if (item.codigo === "INSCRIPCION") return pendingRegistration;
         return packageAvailable(item.codigo);
       });
-  }, [paymentDetail, visiblePeriods, groupedPeriods, registrationRecipients]);
+  }, [
+    paymentDetail,
+    visiblePeriods,
+    groupedPeriods,
+    registrationRecipients,
+  ]);
 
   const availableModalityCodes = useMemo(
     () => availableModalities.map((item) => item.codigo),
@@ -474,7 +480,11 @@ export default function Cuotas() {
       modalidad: fallback,
       seleccion: {},
     }));
-  }, [paymentDetail, availableModalityCodes, paymentForm.modalidad]);
+  }, [
+    paymentDetail,
+    availableModalityCodes,
+    paymentForm.modalidad,
+  ]);
 
   const changePaymentModality = (code) => {
     const months = PACKAGE_MODALITY_MONTHS[code] || [];
@@ -498,7 +508,9 @@ export default function Cuotas() {
   };
 
   const isRegistrationMode = paymentForm.modalidad === "INSCRIPCION";
-  const isPackageMode = Boolean(PACKAGE_MODALITY_MONTHS[paymentForm.modalidad]);
+  const isPackageMode = Boolean(
+    PACKAGE_MODALITY_MONTHS[paymentForm.modalidad],
+  );
 
   const savePayment = async (event) => {
     event.preventDefault();
@@ -567,14 +579,23 @@ export default function Cuotas() {
     }
   };
 
-  const confirmDelete = async () => {
+  const confirmDelete = async (event) => {
+    event.preventDefault();
     if (!deleteModal) return;
-    const response = await cuotasApi.anular(
-      deleteModal.codigo_operacion,
-      deleteModal.lineas || [],
-    );
-    await cargar();
-    return response;
+    setSaving(true);
+    try {
+      const response = await cuotasApi.anular(
+        deleteModal.codigo_operacion,
+        deleteModal.lineas || [],
+      );
+      setDeleteModal(null);
+      setFeedback({ type: "success", message: response.mensaje });
+      await cargar();
+    } catch (err) {
+      setFeedback({ type: "error", message: err.message });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const printReceipt = async (operation) => {
@@ -671,7 +692,9 @@ export default function Cuotas() {
   const appliedFilterLabel = [
     `AÑO ${year}`,
     selectedMonthLabel,
-    tab !== "deudores" && selectedModalityLabel ? selectedModalityLabel : null,
+    tab !== "deudores" && selectedModalityLabel
+      ? selectedModalityLabel
+      : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -773,18 +796,22 @@ export default function Cuotas() {
         label: item,
       })),
     },
-    {
-      key: "mes",
-      label: "Mes aplicado",
-      type: "select",
-      includeEmptyOption: false,
-      value: month,
-      onChange: setMonth,
-      options: (catalogos.meses || []).map((item) => ({
-        value: item.id_mes,
-        label: item.nombre,
-      })),
-    },
+    ...(tab !== "deudores" && modality === "INSCRIPCION"
+      ? []
+      : [
+          {
+            key: "mes",
+            label: "Mes aplicado",
+            type: "select",
+            includeEmptyOption: false,
+            value: month,
+            onChange: setMonth,
+            options: (catalogos.meses || []).map((item) => ({
+              value: item.id_mes,
+              label: item.nombre,
+            })),
+          },
+        ]),
   ];
 
   const secondaryActions = [
@@ -825,7 +852,6 @@ export default function Cuotas() {
         <ModuleFeedback
           type={feedback?.type || "error"}
           message={feedback?.message || error}
-          duration={feedback?.duration}
           onClose={() => setFeedback(null)}
         />
 
@@ -981,10 +1007,7 @@ export default function Cuotas() {
                 <div
                   className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row cuotas-operation-grid"
                   role="row"
-                  key={
-                    item.fila_id ||
-                    `operacion-${item.tipo_registro ?? "registro"}-${item.id_operacion ?? item.codigo_operacion ?? item.id_socio ?? item.socio ?? "socio"}-${item.fecha_pago ?? "fecha"}-${index}`
-                  }
+                  key={item.fila_id || `operacion-${item.tipo_registro ?? "registro"}-${item.id_operacion ?? item.codigo_operacion ?? item.id_socio ?? item.socio ?? "socio"}-${item.fecha_pago ?? "fecha"}-${index}`}
                 >
                   <div className="mov-gridCell entity-main-cell">
                     <strong>{item.socio}</strong>
@@ -1157,10 +1180,7 @@ export default function Cuotas() {
               </div>
             )}
 
-            <section
-              className="cuotas-modality-selector"
-              aria-label="Modalidad de cobro"
-            >
+            <section className="cuotas-modality-selector" aria-label="Modalidad de cobro">
               <label className="entity-field">
                 <span>Concepto / modalidad de cobro *</span>
                 <select
@@ -1182,9 +1202,9 @@ export default function Cuotas() {
                 </select>
               </label>
               <small>
-                Acá elegís CUOTAS MENSUALES, INSCRIPCIÓN, PRIMERA MITAD, SEGUNDA
-                MITAD o CONTADO ANUAL. Las opciones que no corresponden para el
-                socio y el año seleccionado se ocultan.
+                Acá elegís CUOTAS MENSUALES, INSCRIPCIÓN, PRIMERA MITAD,
+                SEGUNDA MITAD o CONTADO ANUAL. Las opciones que no
+                corresponden para el socio y el año seleccionado se ocultan.
               </small>
             </section>
 
@@ -1234,8 +1254,8 @@ export default function Cuotas() {
                 </span>
               ) : (
                 <strong>
-                  No hay pagos o inscripciones pendientes para esta categoría y
-                  año.
+                  No hay pagos o inscripciones pendientes para esta categoría
+                  y año.
                 </strong>
               )}
             </div>
@@ -1250,8 +1270,9 @@ export default function Cuotas() {
                       )?.nombre || "PAGO AGRUPADO"}
                     </strong>
                     <span>
-                      Los meses incluidos se seleccionan automáticamente y el
-                      registro se elimina siempre como un paquete completo.
+                      Los meses incluidos se seleccionan automáticamente, se
+                      aplica el mismo descuento familiar vigente y el registro
+                      se elimina siempre como un paquete completo.
                     </span>
                   </div>
                 ) : (
@@ -1328,11 +1349,7 @@ export default function Cuotas() {
                 </div>
                 <div className="cuotas-selection-summary">
                   <div>
-                    <span>
-                      {isPackageMode
-                        ? "Meses incluidos"
-                        : "Meses seleccionados"}
-                    </span>
+                    <span>{isPackageMode ? "Meses incluidos" : "Meses seleccionados"}</span>
                     <strong>{selectedPeriods.length}</strong>
                   </div>
                   <div>
@@ -1537,73 +1554,43 @@ export default function Cuotas() {
         ) : null}
       </CrudModal>
 
-      <ModalEliminarGlobal
+      <CrudModal
         open={Boolean(deleteModal)}
-        operacion="eliminar"
-        row={deleteModal}
         title={
           deleteModal?.estado === "CONDONADO"
             ? "Eliminar condonación"
             : "Eliminar pago"
         }
-        message={
-          deleteModal?.es_paquete
-            ? "Se anulará el paquete completo y todos sus períodos volverán a quedar pendientes."
-            : "Se anularán las líneas incluidas en esta operación y los períodos volverán a quedar pendientes."
-        }
-        warning="La auditoría de la operación se conservará."
-        details={
+        subtitle={
           deleteModal
-            ? [
-                { label: "Socio", value: deleteModal.socio },
-                {
-                  label: "Modalidad",
-                  value: deleteModal.modalidad_label || deleteModal.concepto,
-                },
-                { label: "Períodos", value: deleteModal.periodos_label },
-                {
-                  label: "Líneas incluidas",
-                  value: deleteModal.cantidad_lineas || 0,
-                },
-                { label: "Monto", value: money(deleteModal.monto) },
-              ]
-            : []
+            ? `${deleteModal.modalidad_label || deleteModal.concepto} · ${deleteModal.periodos_label}`
+            : ""
         }
         onClose={() => setDeleteModal(null)}
-        onConfirm={confirmDelete}
-        onToast={(type, message, duration) =>
-          setFeedback({ type, message, duration })
-        }
-        confirmLabel="Eliminar registro"
-        loadingMessage={
-          deleteModal?.estado === "CONDONADO"
-            ? "Eliminando la condonación…"
-            : "Eliminando el pago…"
-        }
-        successMessage={
-          deleteModal?.estado === "CONDONADO"
-            ? "Condonación eliminada correctamente."
-            : "Pago eliminado correctamente."
-        }
-        errorMessage={
-          deleteModal?.estado === "CONDONADO"
-            ? "No se pudo eliminar la condonación."
-            : "No se pudo eliminar el pago."
-        }
-        extraContent={
-          deleteModal?.es_paquete ? (
-            <div className="cuotas-delete-package-warning">
-              <strong>
-                Este registro corresponde a {deleteModal.modalidad_label}.
-              </strong>
-              <p className="entity-confirm-text">
-                Aunque hayas abierto la acción desde un mes puntual, se anulará
-                el paquete completo de {deleteModal.cantidad_lineas || 0} meses.
-              </p>
-            </div>
-          ) : null
-        }
-      />
+        onSubmit={confirmDelete}
+        saving={saving}
+        submitLabel="Eliminar registro"
+        danger
+      >
+        {deleteModal?.es_paquete ? (
+          <div className="cuotas-delete-package-warning">
+            <strong>
+              Este registro corresponde a {deleteModal.modalidad_label}.
+            </strong>
+            <p className="entity-confirm-text">
+              Al eliminarlo se anulará el paquete completo de {deleteModal.cantidad_lineas || 0}{" "}
+              meses, aunque hayas abierto la acción desde un mes puntual. Todos
+              esos meses volverán a quedar pendientes.
+            </p>
+          </div>
+        ) : (
+          <p className="entity-confirm-text">
+            Se anularán las {deleteModal?.cantidad_lineas || 0} líneas incluidas
+            en esta fila y se conservará la auditoría. Esos períodos volverán a
+            quedar pendientes y podrán pagarse nuevamente.
+          </p>
+        )}
+      </CrudModal>
     </>
   );
 }
