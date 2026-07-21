@@ -1,14 +1,15 @@
 /* Medidas y alineaciones exclusivas de las tablas de Categorías. */
 .categorias-grid {
   grid-template-columns:
-    minmax(180px, 1.1fr)
-    minmax(240px, 1.5fr)
-    minmax(140px, 0.8fr)
-    minmax(90px, 0.5fr)
-    minmax(100px, 0.6fr)
-    minmax(120px, 0.7fr)
-    minmax(120px, 0.7fr);
-  min-width: 1120px;
+    minmax(0, 1.1fr)
+    minmax(0, 1.5fr)
+    minmax(0, 0.8fr)
+    minmax(0, 0.5fr)
+    minmax(0, 0.6fr)
+    minmax(0, 0.7fr)
+    minmax(0, 0.78fr);
+  width: 100%;
+  min-width: 0;
 }
 
 .categorias-grid > :nth-child(3) {
@@ -26,12 +27,13 @@
 
 .categorias-discountsGrid {
   grid-template-columns:
-    minmax(190px, 1fr)
-    minmax(150px, 0.8fr)
-    minmax(280px, 1.5fr)
-    minmax(140px, 0.8fr)
-    minmax(110px, 0.65fr);
-  min-width: 870px;
+    minmax(0, 1fr)
+    minmax(0, 0.8fr)
+    minmax(0, 1.5fr)
+    minmax(0, 0.8fr)
+    minmax(0, 0.65fr);
+  width: 100%;
+  min-width: 0;
 }
 
 .categorias-discountsGrid > :nth-child(1),
@@ -40,6 +42,34 @@
 .categorias-discountsGrid > :nth-child(5) {
   justify-content: center;
   text-align: center;
+}
+
+.categorias-table,
+.categorias-discountsTable,
+.categorias-table .entity-table-wrap,
+.categorias-discountsTable .entity-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.categorias-table .entity-table-wrap,
+.categorias-discountsTable .entity-table-wrap {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.categorias-grid > .mov-gridCell--head,
+.categorias-discountsGrid > .mov-gridCell--head {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.categorias-grid .mov-actionsInline,
+.categorias-discountsGrid .mov-actionsInline {
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .categorias-discountNotice {

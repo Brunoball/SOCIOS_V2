@@ -44,6 +44,17 @@ const dateToday = () => {
     .slice(0, 10);
 };
 const upper = (value) => value.toLocaleUpperCase("es-AR");
+const openDatePicker = (event) => {
+  const input = event.currentTarget;
+
+  if (typeof input.showPicker === "function") {
+    try {
+      input.showPicker();
+    } catch {
+      // El navegador conserva su comportamiento nativo si no puede abrirlo.
+    }
+  }
+};
 const FORM_TAB_PERSONAL = "personal";
 const FORM_TAB_MEMBERSHIP = "membership";
 const INFO_TAB_SUMMARY = "summary";
@@ -166,6 +177,7 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
               type="date"
               value={form.fecha_nacimiento}
               max={dateToday()}
+              onClick={openDatePicker}
               onChange={(e) => update("fecha_nacimiento", e.target.value)}
             />
           </FloatingField>
@@ -185,6 +197,7 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
               type="date"
               value={form.fecha_ingreso}
               max={dateToday()}
+              onClick={openDatePicker}
               onChange={(e) => update("fecha_ingreso", e.target.value)}
             />
           </FloatingField>
@@ -298,36 +311,41 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
             <legend>
               <FontAwesomeIcon icon={faTags} /> Categorías del socio
             </legend>
-            {(catalogos.categorias || []).length ? (
-              (catalogos.categorias || []).map((category) => (
-                <label
-                  key={category.id_categoria}
-                  className={
-                    form.categoria_ids.includes(category.id_categoria)
-                      ? "is-selected"
-                      : ""
-                  }
-                >
-                  <input
-                    type="checkbox"
-                    checked={form.categoria_ids.includes(category.id_categoria)}
-                    disabled={
-                      !category.activo &&
-                      !form.categoria_ids.includes(category.id_categoria)
-                    }
-                    onChange={() => toggleCategory(category.id_categoria)}
-                  />
-                  <span>
-                    {category.nombre}
-                    {category.activo ? "" : " (BAJA)"}
-                  </span>
-                </label>
-              ))
-            ) : (
-              <p className="entity-help">
-                Primero creá una categoría para poder asignarla.
-              </p>
-            )}
+            <div className="socios-categories__grid">
+              {(catalogos.categorias || []).length ? (
+                (catalogos.categorias || []).map((category) => {
+                  const selected = form.categoria_ids.includes(
+                    category.id_categoria,
+                  );
+
+                  return (
+                    <label
+                      key={category.id_categoria}
+                      className={`socios-category-option${selected ? " is-selected" : ""}${!category.activo ? " is-inactive" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        disabled={!category.activo && !selected}
+                        onChange={() => toggleCategory(category.id_categoria)}
+                      />
+                      <span className="socios-category-option__name">
+                        {category.nombre}
+                      </span>
+                      {!category.activo ? (
+                        <small className="socios-category-option__status">
+                          Baja
+                        </small>
+                      ) : null}
+                    </label>
+                  );
+                })
+              ) : (
+                <p className="entity-help socios-categories__empty">
+                  Primero creá una categoría para poder asignarla.
+                </p>
+              )}
+            </div>
           </fieldset>
         </EntityFormPanel>
       )}
@@ -1024,6 +1042,7 @@ export default function Socios() {
                 value={stateForm.fecha_baja}
                 min={stateModal.fecha_ingreso}
                 max={dateToday()}
+                onClick={openDatePicker}
                 onChange={(e) =>
                   setStateForm((current) => ({
                     ...current,

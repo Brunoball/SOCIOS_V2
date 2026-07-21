@@ -1,15 +1,39 @@
 /* Medidas y alineaciones exclusivas de la tabla de Socios. */
 .socios-grid {
   grid-template-columns:
-    minmax(190px, 1.4fr)
-    minmax(110px, 0.65fr)
-    minmax(160px, 1fr)
-    minmax(140px, 0.9fr)
-    minmax(160px, 1fr)
-    minmax(110px, 0.7fr)
-    minmax(90px, 0.6fr)
-    minmax(96px, 0.55fr);
-  min-width: 1180px;
+    minmax(0, 1.4fr)
+    minmax(0, 0.65fr)
+    minmax(0, 1fr)
+    minmax(0, 0.9fr)
+    minmax(0, 1fr)
+    minmax(0, 0.7fr)
+    minmax(0, 0.6fr)
+    minmax(0, 0.7fr);
+  width: 100%;
+  min-width: 0;
+}
+
+.socios-table,
+.socios-table .entity-table-wrap {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.socios-table .entity-table-wrap {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.socios-grid > .mov-gridCell--head {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.socios-grid .mov-actionsInline {
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .socios-grid > :nth-child(6),
