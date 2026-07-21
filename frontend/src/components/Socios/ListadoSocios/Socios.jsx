@@ -32,8 +32,8 @@ import {
   FloatingField,
 } from "../../Global/components/TabbedForm";
 import { canWrite } from "../../Global/auth/session";
-import { sociosApi } from "./api/sociosApi";
-import { useSocios } from "./hooks/useSocios";
+import { sociosApi } from "../api/sociosApi";
+import { useSocios } from "../hooks/useSocios";
 import "./Socios.css";
 import "./SociosModal.css";
 

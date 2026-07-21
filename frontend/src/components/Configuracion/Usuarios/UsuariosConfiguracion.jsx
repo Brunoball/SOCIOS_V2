@@ -14,7 +14,7 @@ import CrudModal from "../../Global/components/CrudModal";
 import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../../Global/components/ModuleFeedback";
 import { getSession, saveSession } from "../../Global/auth/session";
-import { configuracionApi } from "../shared/api/configuracionApi";
+import { configuracionApi } from "../api/configuracionApi";
 import "./UsuariosConfiguracion.css";
 
 const EMPTY_SUMMARY = { total: 0, activos: 0, bajas: 0, admins: 0 };

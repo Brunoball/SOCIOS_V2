@@ -21,8 +21,8 @@ import CrudModal from "../../Global/components/CrudModal";
 import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../../Global/components/ModuleFeedback";
 import { canWrite } from "../../Global/auth/session";
-import { configuracionApi } from "./api/configuracionApi";
-import { useConfiguracion } from "./hooks/useConfiguracion";
+import { configuracionApi } from "../api/configuracionApi";
+import { useConfiguracion } from "../hooks/useConfiguracion";
 import "./Configuracion.css";
 
 const upper = (value) => String(value ?? "").toLocaleUpperCase("es-AR");

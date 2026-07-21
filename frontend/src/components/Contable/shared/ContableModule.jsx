@@ -28,7 +28,7 @@ import {
   FloatingField,
 } from "../../Global/components/TabbedForm";
 import { canWrite } from "../../Global/auth/session";
-import { contableApi } from "./api/contableApi";
+import { contableApi } from "../api/contableApi";
 import "./Contable.css";
 
 const now = new Date();

@@ -19,8 +19,8 @@ import {
   FloatingField,
 } from "../../Global/components/TabbedForm";
 import { canWrite } from "../../Global/auth/session";
-import { cuotasApi } from "./api/cuotasApi";
-import { useCuotas } from "./hooks/useCuotas";
+import { cuotasApi } from "../api/cuotasApi";
+import { useCuotas } from "../hooks/useCuotas";
 import "./Cuotas.css";
 import "./CuotasModal.css";
 

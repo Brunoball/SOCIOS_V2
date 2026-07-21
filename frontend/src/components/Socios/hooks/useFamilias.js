@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { familiasApi } from "../api/familiasApi";
+import { familiasApi } from "../api/sociosApi";
 
 export function useFamilias(filtros = {}) {
   const query = useMemo(() => JSON.stringify(filtros), [filtros]);

@@ -28,9 +28,9 @@ import {
   FloatingField,
 } from "../../Global/components/TabbedForm";
 import { canWrite } from "../../Global/auth/session";
-import { categoriasApi } from "./api/categoriasApi";
-import { useCategorias } from "./hooks/useCategorias";
-import { useDescuentosFamiliares } from "./hooks/useDescuentosFamiliares";
+import { categoriasApi } from "../api/categoriasApi";
+import { useCategorias } from "../hooks/useCategorias";
+import { useDescuentosFamiliares } from "../hooks/useDescuentosFamiliares";
 import "./Categorias.css";
 import "./CategoriasModal.css";
 
