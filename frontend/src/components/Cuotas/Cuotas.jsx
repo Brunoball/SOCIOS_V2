@@ -1,15 +1,23 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
+  faCalendarDays,
   faFileExcel,
   faPrint,
   faReceipt,
   faTrashCan,
+  faUser,
+  faWallet,
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../Global/components/ModulePage";
 import CrudModal from "../Global/components/CrudModal";
 import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../Global/components/ModuleFeedback";
+import {
+  EntityFormPanel,
+  EntityTabs,
+  FloatingField,
+} from "../Global/components/TabbedForm";
 import { canWrite } from "../Global/auth/session";
 import { cuotasApi } from "./api/cuotasApi";
 import { useCuotas } from "./hooks/useCuotas";
@@ -25,6 +33,8 @@ const today = () => {
 const currentDate = new Date();
 const currentYear = currentDate.getFullYear();
 const currentMonth = currentDate.getMonth() + 1;
+const PAYMENT_TAB_PERIODS = "periods";
+const PAYMENT_TAB_CHECKOUT = "checkout";
 const PACKAGE_MODALITY_MONTHS = {
   PRIMERA_MITAD: [1, 2, 3, 4, 5, 6],
   SEGUNDA_MITAD: [7, 8, 9, 10, 11, 12],
@@ -151,6 +161,7 @@ export default function Cuotas() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedPartner, setPickedPartner] = useState("");
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentTab, setPaymentTab] = useState(PAYMENT_TAB_PERIODS);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentDetail, setPaymentDetail] = useState(null);
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm());
@@ -183,6 +194,7 @@ export default function Cuotas() {
     initialPeriod = null,
   ) => {
     setPickerOpen(false);
+    setPaymentTab(PAYMENT_TAB_PERIODS);
     setPaymentOpen(true);
     setPaymentLoading(true);
     setPaymentDetail(null);
@@ -765,6 +777,7 @@ export default function Cuotas() {
       key: "anio",
       label: "Año aplicado",
       type: "select",
+      className: "cuotas-year-filter",
       includeEmptyOption: false,
       value: year,
       onChange: setYear,
@@ -812,8 +825,10 @@ export default function Cuotas() {
         title="Cuotas"
         filters={pageFilters}
         tabsInTitle
+        headFiltersClassName="cuotas-head-filters"
         secondaryActions={secondaryActions}
         primaryActionLabel="Registrar pago"
+        primaryActionClassName="cuotas-header-primary-action"
         onPrimaryAction={() => setPickerOpen(true)}
         canCreate={writable}
         notice={
@@ -1042,8 +1057,18 @@ export default function Cuotas() {
 
         <div
           className="cuotas-output-actions--bottom"
-          aria-label="Acciones de exportación"
+          aria-label="Acciones de cuotas"
         >
+          {writable ? (
+            <button
+              className="mov-btn cuotas-output-button cuotas-output-button--primary"
+              type="button"
+              onClick={() => setPickerOpen(true)}
+            >
+              <FontAwesomeIcon icon={faWallet} />
+              Registrar pago
+            </button>
+          ) : null}
           <button
             className="mov-btn cuotas-output-button"
             type="button"
@@ -1075,25 +1100,38 @@ export default function Cuotas() {
           if (pickedPartner) openPayment(pickedPartner);
         }}
         submitLabel="Continuar"
+        modalClassName="cuotas-modal cuotas-modal--picker"
       >
-        <div className="entity-form">
-          <label className="entity-field">
-            <span>Socio *</span>
-            <select
-              value={pickedPartner}
-              onChange={(event) => setPickedPartner(event.target.value)}
-              required
-            >
-              <option value="">SELECCIONAR SOCIO</option>
-              {fullCatalogs.socios.map((socio) => (
-                <option key={socio.id_socio} value={socio.id_socio}>
-                  {socio.apellido}, {socio.nombre} · DNI {socio.dni}
-                  {socio.familia ? ` · ${socio.familia}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <section className="cuotas-picker-card">
+          <span className="cuotas-picker-card__icon">
+            <FontAwesomeIcon icon={faUser} />
+          </span>
+          <div className="cuotas-picker-card__content">
+            <div>
+              <small>Primer paso</small>
+              <strong>Seleccioná un socio</strong>
+              <p>
+                Se consultarán sus categorías, períodos pendientes y grupo
+                familiar antes de registrar el cobro.
+              </p>
+            </div>
+            <FloatingField label="Socio *" active>
+              <select
+                value={pickedPartner}
+                onChange={(event) => setPickedPartner(event.target.value)}
+                required
+              >
+                <option value="">SELECCIONAR SOCIO</option>
+                {fullCatalogs.socios.map((socio) => (
+                  <option key={socio.id_socio} value={socio.id_socio}>
+                    {socio.apellido}, {socio.nombre} · DNI {socio.dni}
+                    {socio.familia ? ` · ${socio.familia}` : ""}
+                  </option>
+                ))}
+              </select>
+            </FloatingField>
+          </div>
+        </section>
       </CrudModal>
 
       <CrudModal
@@ -1112,8 +1150,12 @@ export default function Cuotas() {
         }
         wide
         hideSubmit={
-          paymentLoading || !paymentDetail || !availableModalities.length
+          paymentLoading ||
+          !paymentDetail ||
+          !availableModalities.length ||
+          paymentTab !== PAYMENT_TAB_CHECKOUT
         }
+        modalClassName="cuotas-modal cuotas-modal--payment"
       >
         {paymentLoading ? (
           <p className="entity-confirm-text">
@@ -1122,320 +1164,430 @@ export default function Cuotas() {
         ) : null}
         {paymentDetail ? (
           <div className="cuotas-payment-form">
-            {paymentDetail.familia ? (
-              <section className="cuotas-family-box">
-                <div>
-                  <strong>
-                    Grupo familiar: {paymentDetail.familia.nombre}
-                  </strong>
-                  <span>
-                    {paymentDetail.integrantes
-                      .map((member) => member.socio)
-                      .join(" · ")}
-                  </span>
+            <EntityTabs
+              tabs={[
+                {
+                  value: PAYMENT_TAB_PERIODS,
+                  label: "Modalidad y períodos",
+                  icon: faCalendarDays,
+                  badge: isRegistrationMode
+                    ? registrationRecipients.filter(
+                        (member) => member.estado === "PENDIENTE",
+                      ).length || null
+                    : selectedPeriods.length || null,
+                },
+                {
+                  value: PAYMENT_TAB_CHECKOUT,
+                  label: "Cobro y confirmación",
+                  icon: faWallet,
+                },
+              ]}
+              value={paymentTab}
+              onChange={setPaymentTab}
+              idPrefix="cuotas-payment-tab"
+              ariaLabel="Etapas del registro de pago"
+            />
+
+            {paymentTab === PAYMENT_TAB_PERIODS ? (
+              <EntityFormPanel
+                tabValue={PAYMENT_TAB_PERIODS}
+                idPrefix="cuotas-payment-tab"
+                eyebrow="Configuración del cobro"
+                title="Modalidad, categoría y períodos"
+                icon={faCalendarDays}
+                tag="Paso 1 de 2"
+                bodyClassName="cuotas-payment-panel__body"
+              >
+                {paymentDetail.familia ? (
+                  <section className="cuotas-family-box">
+                    <div>
+                      <strong>
+                        Grupo familiar: {paymentDetail.familia.nombre}
+                      </strong>
+                      <span>
+                        {paymentDetail.integrantes
+                          .map((member) => member.socio)
+                          .join(" · ")}
+                      </span>
+                      <small>
+                        Descuento familiar:{" "}
+                        {percent(paymentDetail.familia.porcentaje_descuento)}.
+                        Se aplica aunque cobres solamente a este socio.
+                      </small>
+                    </div>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={paymentForm.aplicar_familia}
+                        onChange={(event) =>
+                          changeFamilyScope(event.target.checked)
+                        }
+                      />{" "}
+                      Incluir a todo el grupo familiar
+                    </label>
+                  </section>
+                ) : (
+                  <div className="module-notice">
+                    El socio no pertenece a un grupo familiar; no se aplica
+                    descuento.
+                  </div>
+                )}
+
+                <section
+                  className="cuotas-modality-selector"
+                  aria-label="Modalidad de cobro"
+                >
+                  <FloatingField label="Concepto / modalidad de cobro *" active>
+                    <select
+                      value={paymentForm.modalidad}
+                      onChange={(event) =>
+                        changePaymentModality(event.target.value)
+                      }
+                      required
+                      disabled={!availableModalities.length}
+                    >
+                      {!availableModalities.length ? (
+                        <option value="">SIN MODALIDADES DISPONIBLES</option>
+                      ) : null}
+                      {availableModalities.map((item) => (
+                        <option key={item.codigo} value={item.codigo}>
+                          {modalityOptionLabel(item)}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
                   <small>
-                    Descuento familiar:{" "}
-                    {percent(paymentDetail.familia.porcentaje_descuento)}. Se
-                    aplica aunque cobres solamente a este socio.
+                    Acá elegís CUOTAS MENSUALES, INSCRIPCIÓN, PRIMERA MITAD,
+                    SEGUNDA MITAD o CONTADO ANUAL. Las opciones que no
+                    corresponden para el socio y el año seleccionado se ocultan.
                   </small>
+                </section>
+
+                <div className="entity-form__grid cuotas-payment-controls">
+                  <FloatingField label="Categoría" active>
+                    <select
+                      value={paymentForm.id_categoria}
+                      onChange={(event) =>
+                        changePaymentCategory(event.target.value)
+                      }
+                      required
+                    >
+                      {paymentDetail.categorias.map((item) => (
+                        <option
+                          key={item.id_categoria}
+                          value={item.id_categoria}
+                        >
+                          {item.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </FloatingField>
+                  <div className="cuotas-year-control">
+                    <FloatingField label="Año" active>
+                      <select
+                        value={paymentForm.anio}
+                        onChange={(event) =>
+                          changePaymentYear(event.target.value)
+                        }
+                      >
+                        {paymentDetail.anios.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </select>
+                    </FloatingField>
+                    <span className="cuotas-year-enabled">
+                      AÑO {paymentDetail.anio_maximo_habilitado} HABILITADO
+                    </span>
+                  </div>
                 </div>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={paymentForm.aplicar_familia}
-                    onChange={(event) =>
-                      changeFamilyScope(event.target.checked)
-                    }
-                  />{" "}
-                  Incluir a todo el grupo familiar
-                </label>
-              </section>
-            ) : (
-              <div className="module-notice">
-                El socio no pertenece a un grupo familiar; no se aplica
-                descuento.
-              </div>
-            )}
 
-            <section
-              className="cuotas-modality-selector"
-              aria-label="Modalidad de cobro"
-            >
-              <label className="entity-field">
-                <span>Concepto / modalidad de cobro *</span>
-                <select
-                  value={paymentForm.modalidad}
-                  onChange={(event) =>
-                    changePaymentModality(event.target.value)
-                  }
-                  required
-                  disabled={!availableModalities.length}
-                >
-                  {!availableModalities.length ? (
-                    <option value="">SIN MODALIDADES DISPONIBLES</option>
-                  ) : null}
-                  {availableModalities.map((item) => (
-                    <option key={item.codigo} value={item.codigo}>
-                      {modalityOptionLabel(item)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <small>
-                Acá elegís CUOTAS MENSUALES, INSCRIPCIÓN, PRIMERA MITAD, SEGUNDA
-                MITAD o CONTADO ANUAL. Las opciones que no corresponden para el
-                socio y el año seleccionado se ocultan.
-              </small>
-            </section>
+                <div className="cuotas-modality-help">
+                  {availableModalities.length ? (
+                    <span>
+                      Las modalidades se habilitan según la fecha de ingreso y
+                      los pagos del año. Las opciones que ya no corresponden no
+                      se muestran.
+                    </span>
+                  ) : (
+                    <strong>
+                      No hay pagos o inscripciones pendientes para esta
+                      categoría y año.
+                    </strong>
+                  )}
+                </div>
 
-            <div className="entity-form__grid cuotas-payment-controls">
-              <label className="entity-field">
-                <span>Categoría</span>
-                <select
-                  value={paymentForm.id_categoria}
-                  onChange={(event) =>
-                    changePaymentCategory(event.target.value)
-                  }
-                  required
-                >
-                  {paymentDetail.categorias.map((item) => (
-                    <option key={item.id_categoria} value={item.id_categoria}>
-                      {item.nombre}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="cuotas-year-control">
-                <label className="entity-field">
-                  <span>Año</span>
-                  <select
-                    value={paymentForm.anio}
-                    onChange={(event) => changePaymentYear(event.target.value)}
+                {!isRegistrationMode ? (
+                  <>
+                    {isPackageMode ? (
+                      <div className="cuotas-package-notice">
+                        <strong>
+                          {availableModalities.find(
+                            (item) => item.codigo === paymentForm.modalidad,
+                          )?.nombre || "PAGO AGRUPADO"}
+                        </strong>
+                        <span>
+                          Los meses incluidos se seleccionan automáticamente y
+                          el registro se elimina siempre como un paquete
+                          completo.
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="cuotas-quick-actions">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            selectVisible(
+                              (period) =>
+                                period.id_mes === new Date().getMonth() + 1,
+                            )
+                          }
+                        >
+                          Mes actual
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => selectVisible(() => true)}
+                        >
+                          Todos los pendientes
+                        </button>
+                        <button type="button" onClick={clearVisible}>
+                          Limpiar selección
+                        </button>
+                      </div>
+                    )}
+                    <div className="cuotas-period-list">
+                      {groupedPeriods.map((group) => (
+                        <section
+                          className="cuotas-period-group"
+                          key={group.id_socio}
+                        >
+                          <header>
+                            <strong>{group.socio}</strong>
+                            <span>
+                              {paymentDetail.familia
+                                ? percent(
+                                    paymentDetail.familia.porcentaje_descuento,
+                                  )
+                                : "SIN DESCUENTO"}
+                            </span>
+                          </header>
+                          <div className="cuotas-month-grid">
+                            {group.periods.map((period) => (
+                              <button
+                                type="button"
+                                key={period.clave}
+                                disabled={
+                                  period.estado !== "PENDIENTE" || isPackageMode
+                                }
+                                className={`${paymentForm.seleccion[period.clave] ? "is-selected" : ""} ${period.estado !== "PENDIENTE" ? "is-disabled" : ""} ${isPackageMode ? "is-package" : ""}`}
+                                onClick={() => togglePeriod(period)}
+                              >
+                                <strong>{period.mes.slice(0, 3)}</strong>
+                                <span>
+                                  {period.estado === "PENDIENTE"
+                                    ? money(period.monto)
+                                    : period.estado}
+                                </span>
+                                {period.es_futuro &&
+                                period.estado === "PENDIENTE" ? (
+                                  <small>ANTICIPADA</small>
+                                ) : null}
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                      {!groupedPeriods.length ? (
+                        <p className="entity-help">
+                          No hay períodos para esta categoría y año.
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="cuotas-selection-summary">
+                      <div>
+                        <span>
+                          {isPackageMode
+                            ? "Meses incluidos"
+                            : "Meses seleccionados"}
+                        </span>
+                        <strong>{selectedPeriods.length}</strong>
+                      </div>
+                      <div>
+                        <span>Monto base</span>
+                        <strong>{money(totals.base)}</strong>
+                      </div>
+                      <div>
+                        <span>Total con descuento</span>
+                        <strong>{money(totals.final)}</strong>
+                      </div>
+                      <div>
+                        <span>A cobrar</span>
+                        <strong>
+                          {money(paymentForm.condonado ? 0 : totals.final)}
+                        </strong>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="cuotas-registration-box">
+                    <div className="entity-form__grid">
+                      <FloatingField
+                        label="Monto base por integrante *"
+                        active={Boolean(paymentForm.monto_inscripcion)}
+                      >
+                        <input
+                          type="number"
+                          placeholder=" "
+                          min="0.01"
+                          step="0.01"
+                          value={paymentForm.monto_inscripcion}
+                          onChange={(event) =>
+                            updateForm("monto_inscripcion", event.target.value)
+                          }
+                          required
+                        />
+                      </FloatingField>
+                      <FloatingField
+                        label="Descripción"
+                        active={Boolean(paymentForm.descripcion_inscripcion)}
+                      >
+                        <input
+                          placeholder=" "
+                          value={paymentForm.descripcion_inscripcion}
+                          onChange={(event) =>
+                            updateForm(
+                              "descripcion_inscripcion",
+                              event.target.value.toLocaleUpperCase("es-AR"),
+                            )
+                          }
+                          maxLength={255}
+                        />
+                      </FloatingField>
+                    </div>
+                    <div className="cuotas-registration-members">
+                      {registrationRecipients.map((member) => (
+                        <article key={member.id_socio}>
+                          <strong>{member.socio}</strong>
+                          <span
+                            className={`mov-chip ${member.estado === "PENDIENTE" ? "" : member.estado === "PAGADO" ? "mov-chip--ok" : "mov-chip--danger"}`}
+                          >
+                            {member.estado}
+                          </span>
+                        </article>
+                      ))}
+                      {!registrationRecipients.length ? (
+                        <p className="entity-help">
+                          Ningún integrante seleccionado tiene esta categoría en
+                          el año indicado.
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="cuotas-selection-summary">
+                      <div>
+                        <span>Integrantes</span>
+                        <strong>
+                          {
+                            registrationRecipients.filter(
+                              (member) => member.estado === "PENDIENTE",
+                            ).length
+                          }
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Base total</span>
+                        <strong>
+                          {money(
+                            Number(paymentForm.monto_inscripcion || 0) *
+                              registrationRecipients.filter(
+                                (member) => member.estado === "PENDIENTE",
+                              ).length,
+                          )}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Descuento familiar</span>
+                        <strong>
+                          {percent(
+                            paymentDetail.familia?.porcentaje_descuento || 0,
+                          )}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>A cobrar</span>
+                        <strong>
+                          {money(
+                            paymentForm.condonado
+                              ? 0
+                              : Number(paymentForm.monto_inscripcion || 0) *
+                                  registrationRecipients.filter(
+                                    (member) => member.estado === "PENDIENTE",
+                                  ).length *
+                                  (1 -
+                                    Number(
+                                      paymentDetail.familia
+                                        ?.porcentaje_descuento || 0,
+                                    ) /
+                                      100),
+                          )}
+                        </strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="cuotas-payment-panel__next">
+                  <button
+                    className="mov-btn mov-btn--primary"
+                    type="button"
+                    onClick={() => setPaymentTab(PAYMENT_TAB_CHECKOUT)}
+                    disabled={!availableModalities.length}
                   >
-                    {paymentDetail.anios.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <span className="cuotas-year-enabled">
-                  AÑO {paymentDetail.anio_maximo_habilitado} HABILITADO
-                </span>
-              </div>
-            </div>
-
-            <div className="cuotas-modality-help">
-              {availableModalities.length ? (
-                <span>
-                  Las modalidades se habilitan según la fecha de ingreso y los
-                  pagos del año. Las opciones que ya no corresponden no se
-                  muestran.
-                </span>
-              ) : (
-                <strong>
-                  No hay pagos o inscripciones pendientes para esta categoría y
-                  año.
-                </strong>
-              )}
-            </div>
-
-            {!isRegistrationMode ? (
-              <>
-                {isPackageMode ? (
-                  <div className="cuotas-package-notice">
+                    Continuar al cobro
+                  </button>
+                </div>
+              </EntityFormPanel>
+            ) : (
+              <EntityFormPanel
+                tabValue={PAYMENT_TAB_CHECKOUT}
+                idPrefix="cuotas-payment-tab"
+                eyebrow="Confirmación"
+                title="Datos del cobro"
+                icon={faWallet}
+                tag="Paso 2 de 2"
+                bodyClassName="cuotas-checkout-panel__body"
+                hint="Revisá el importe y completá los datos del movimiento antes de registrarlo."
+              >
+                <div className="cuotas-checkout-summary">
+                  <div>
+                    <span>
+                      {isRegistrationMode ? "Integrantes" : "Períodos"}
+                    </span>
+                    <strong>
+                      {isRegistrationMode
+                        ? registrationRecipients.filter(
+                            (member) => member.estado === "PENDIENTE",
+                          ).length
+                        : selectedPeriods.length}
+                    </strong>
+                  </div>
+                  <div>
+                    <span>Modalidad</span>
                     <strong>
                       {availableModalities.find(
                         (item) => item.codigo === paymentForm.modalidad,
-                      )?.nombre || "PAGO AGRUPADO"}
-                    </strong>
-                    <span>
-                      Los meses incluidos se seleccionan automáticamente y el
-                      registro se elimina siempre como un paquete completo.
-                    </span>
-                  </div>
-                ) : (
-                  <div className="cuotas-quick-actions">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        selectVisible(
-                          (period) =>
-                            period.id_mes === new Date().getMonth() + 1,
-                        )
-                      }
-                    >
-                      Mes actual
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => selectVisible(() => true)}
-                    >
-                      Todos los pendientes
-                    </button>
-                    <button type="button" onClick={clearVisible}>
-                      Limpiar selección
-                    </button>
-                  </div>
-                )}
-                <div className="cuotas-period-list">
-                  {groupedPeriods.map((group) => (
-                    <section
-                      className="cuotas-period-group"
-                      key={group.id_socio}
-                    >
-                      <header>
-                        <strong>{group.socio}</strong>
-                        <span>
-                          {paymentDetail.familia
-                            ? percent(
-                                paymentDetail.familia.porcentaje_descuento,
-                              )
-                            : "SIN DESCUENTO"}
-                        </span>
-                      </header>
-                      <div className="cuotas-month-grid">
-                        {group.periods.map((period) => (
-                          <button
-                            type="button"
-                            key={period.clave}
-                            disabled={
-                              period.estado !== "PENDIENTE" || isPackageMode
-                            }
-                            className={`${paymentForm.seleccion[period.clave] ? "is-selected" : ""} ${period.estado !== "PENDIENTE" ? "is-disabled" : ""} ${isPackageMode ? "is-package" : ""}`}
-                            onClick={() => togglePeriod(period)}
-                          >
-                            <strong>{period.mes.slice(0, 3)}</strong>
-                            <span>
-                              {period.estado === "PENDIENTE"
-                                ? money(period.monto)
-                                : period.estado}
-                            </span>
-                            {period.es_futuro &&
-                            period.estado === "PENDIENTE" ? (
-                              <small>ANTICIPADA</small>
-                            ) : null}
-                          </button>
-                        ))}
-                      </div>
-                    </section>
-                  ))}
-                  {!groupedPeriods.length ? (
-                    <p className="entity-help">
-                      No hay períodos para esta categoría y año.
-                    </p>
-                  ) : null}
-                </div>
-                <div className="cuotas-selection-summary">
-                  <div>
-                    <span>
-                      {isPackageMode
-                        ? "Meses incluidos"
-                        : "Meses seleccionados"}
-                    </span>
-                    <strong>{selectedPeriods.length}</strong>
-                  </div>
-                  <div>
-                    <span>Monto base</span>
-                    <strong>{money(totals.base)}</strong>
-                  </div>
-                  <div>
-                    <span>Total con descuento</span>
-                    <strong>{money(totals.final)}</strong>
-                  </div>
-                  <div>
-                    <span>A cobrar</span>
-                    <strong>
-                      {money(paymentForm.condonado ? 0 : totals.final)}
-                    </strong>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="cuotas-registration-box">
-                <div className="entity-form__grid">
-                  <label className="entity-field">
-                    <span>Monto base por integrante *</span>
-                    <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={paymentForm.monto_inscripcion}
-                      onChange={(event) =>
-                        updateForm("monto_inscripcion", event.target.value)
-                      }
-                      required
-                    />
-                  </label>
-                  <label className="entity-field">
-                    <span>Descripción</span>
-                    <input
-                      value={paymentForm.descripcion_inscripcion}
-                      onChange={(event) =>
-                        updateForm(
-                          "descripcion_inscripcion",
-                          event.target.value.toLocaleUpperCase("es-AR"),
-                        )
-                      }
-                      maxLength={255}
-                    />
-                  </label>
-                </div>
-                <div className="cuotas-registration-members">
-                  {registrationRecipients.map((member) => (
-                    <article key={member.id_socio}>
-                      <strong>{member.socio}</strong>
-                      <span
-                        className={`mov-chip ${member.estado === "PENDIENTE" ? "" : member.estado === "PAGADO" ? "mov-chip--ok" : "mov-chip--danger"}`}
-                      >
-                        {member.estado}
-                      </span>
-                    </article>
-                  ))}
-                  {!registrationRecipients.length ? (
-                    <p className="entity-help">
-                      Ningún integrante seleccionado tiene esta categoría en el
-                      año indicado.
-                    </p>
-                  ) : null}
-                </div>
-                <div className="cuotas-selection-summary">
-                  <div>
-                    <span>Integrantes</span>
-                    <strong>
-                      {
-                        registrationRecipients.filter(
-                          (member) => member.estado === "PENDIENTE",
-                        ).length
-                      }
+                      )?.nombre || "—"}
                     </strong>
                   </div>
                   <div>
-                    <span>Base total</span>
-                    <strong>
-                      {money(
-                        Number(paymentForm.monto_inscripcion || 0) *
-                          registrationRecipients.filter(
-                            (member) => member.estado === "PENDIENTE",
-                          ).length,
-                      )}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Descuento familiar</span>
-                    <strong>
-                      {percent(
-                        paymentDetail.familia?.porcentaje_descuento || 0,
-                      )}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>A cobrar</span>
+                    <span>Total a cobrar</span>
                     <strong>
                       {money(
                         paymentForm.condonado
                           ? 0
-                          : Number(paymentForm.monto_inscripcion || 0) *
+                          : isRegistrationMode
+                            ? Number(paymentForm.monto_inscripcion || 0) *
                               registrationRecipients.filter(
                                 (member) => member.estado === "PENDIENTE",
                               ).length *
@@ -1444,95 +1596,103 @@ export default function Cuotas() {
                                   paymentDetail.familia?.porcentaje_descuento ||
                                     0,
                                 ) /
-                                  100),
+                                  100)
+                            : totals.final,
                       )}
                     </strong>
                   </div>
                 </div>
-              </div>
-            )}
 
-            <section className="cuotas-payment-data">
-              <label className="cuotas-condone-toggle">
-                <input
-                  type="checkbox"
-                  checked={paymentForm.condonado}
-                  onChange={(event) =>
-                    updateForm("condonado", event.target.checked)
-                  }
-                />
-                <span>
-                  <strong>Condonar este registro</strong>
-                  <small>
-                    Se guarda el importe teórico, pero el monto cobrado será $0.
-                  </small>
-                </span>
-              </label>
-              <div className="entity-form__grid">
-                <label className="entity-field">
-                  <span>Fecha *</span>
-                  <input
-                    type="date"
-                    max={today()}
-                    value={paymentForm.fecha_pago}
-                    onChange={(event) =>
-                      updateForm("fecha_pago", event.target.value)
-                    }
-                    required
-                  />
-                </label>
-                {!paymentForm.condonado ? (
-                  <label className="entity-field">
-                    <span>Medio de pago *</span>
-                    <select
-                      value={paymentForm.id_medio_pago}
-                      onChange={(event) =>
-                        updateForm("id_medio_pago", event.target.value)
-                      }
-                      required
-                    >
-                      {paymentDetail.medios_pago.map((item) => (
-                        <option
-                          key={item.id_medio_pago}
-                          value={item.id_medio_pago}
-                        >
-                          {item.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : (
-                  <label className="entity-field">
-                    <span>Motivo de condonación *</span>
+                <section className="cuotas-payment-data">
+                  <label className="cuotas-condone-toggle">
                     <input
-                      value={paymentForm.motivo_condonacion}
+                      type="checkbox"
+                      checked={paymentForm.condonado}
                       onChange={(event) =>
-                        updateForm(
-                          "motivo_condonacion",
-                          event.target.value.toLocaleUpperCase("es-AR"),
-                        )
+                        updateForm("condonado", event.target.checked)
                       }
-                      maxLength={500}
-                      required
                     />
+                    <span>
+                      <strong>Condonar este registro</strong>
+                      <small>
+                        Se guarda el importe teórico, pero el monto cobrado será
+                        $0.
+                      </small>
+                    </span>
                   </label>
-                )}
-                <label className="entity-field entity-field--wide">
-                  <span>Observaciones</span>
-                  <textarea
-                    value={paymentForm.observaciones}
-                    onChange={(event) =>
-                      updateForm(
-                        "observaciones",
-                        event.target.value.toLocaleUpperCase("es-AR"),
-                      )
-                    }
-                    rows={2}
-                    maxLength={500}
-                  />
-                </label>
-              </div>
-            </section>
+                  <div className="entity-form__grid">
+                    <FloatingField label="Fecha *" active>
+                      <input
+                        type="date"
+                        max={today()}
+                        value={paymentForm.fecha_pago}
+                        onChange={(event) =>
+                          updateForm("fecha_pago", event.target.value)
+                        }
+                        required
+                      />
+                    </FloatingField>
+                    {!paymentForm.condonado ? (
+                      <FloatingField label="Medio de pago *" active>
+                        <select
+                          value={paymentForm.id_medio_pago}
+                          onChange={(event) =>
+                            updateForm("id_medio_pago", event.target.value)
+                          }
+                          required
+                        >
+                          {paymentDetail.medios_pago.map((item) => (
+                            <option
+                              key={item.id_medio_pago}
+                              value={item.id_medio_pago}
+                            >
+                              {item.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      </FloatingField>
+                    ) : (
+                      <FloatingField
+                        label="Motivo de condonación *"
+                        active={Boolean(paymentForm.motivo_condonacion)}
+                      >
+                        <input
+                          placeholder=" "
+                          value={paymentForm.motivo_condonacion}
+                          onChange={(event) =>
+                            updateForm(
+                              "motivo_condonacion",
+                              event.target.value.toLocaleUpperCase("es-AR"),
+                            )
+                          }
+                          maxLength={500}
+                          required
+                        />
+                      </FloatingField>
+                    )}
+                    <FloatingField
+                      label="Observaciones"
+                      active={Boolean(paymentForm.observaciones)}
+                      textarea
+                      wide
+                    >
+                      <textarea
+                        placeholder=" "
+                        value={paymentForm.observaciones}
+                        onChange={(event) =>
+                          updateForm(
+                            "observaciones",
+                            event.target.value.toLocaleUpperCase("es-AR"),
+                          )
+                        }
+                        rows={2}
+                        maxLength={500}
+                      />
+                    </FloatingField>
+                  </div>
+                </section>
+              </EntityFormPanel>
+            )}
           </div>
         ) : null}
       </CrudModal>

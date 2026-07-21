@@ -16,6 +16,7 @@ export default function CrudModal({
   danger = false,
   wide = false,
   hideSubmit = false,
+  cancelLabel = "Cancelar",
   modalClassName = "",
 }) {
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function CrudModal({
               onClick={onClose}
               disabled={saving}
             >
-              Cancelar
+              {cancelLabel}
             </button>
             {!hideSubmit ? (
               <button
