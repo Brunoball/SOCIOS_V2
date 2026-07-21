@@ -8,6 +8,7 @@ import Cuotas from "./components/Cuotas/Cuotas";
 import Categorias from "./components/Categorias/Categorias";
 import Configuracion from "./components/Configuracion/Configuracion";
 import Contable from "./components/Contable/Contable";
+import Dashboard from "./components/Dashboard/Dashboard";
 import { isAuthenticated } from "./components/Global/auth/session";
 
 function ProtectedLayout() {
@@ -18,9 +19,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={isAuthenticated() ? <Navigate to="/socios" replace /> : <Inicio />} />
+        <Route path="/" element={isAuthenticated() ? <Navigate to="/panel" replace /> : <Inicio />} />
         <Route element={<ProtectedLayout />}>
-          <Route path="/panel" element={<Navigate to="/socios" replace />} />
+          <Route path="/panel" element={<Dashboard />} />
           <Route path="/socios" element={<Socios />} />
           <Route path="/socios/familias" element={<Familias />} />
           <Route path="/cuotas" element={<Cuotas />} />
@@ -30,7 +31,7 @@ export default function App() {
           <Route path="/contable/egresos" element={<Contable />} />
           <Route path="/configuracion" element={<Configuracion />} />
         </Route>
-        <Route path="*" element={<Navigate to="/socios" replace />} />
+        <Route path="*" element={<Navigate to="/panel" replace />} />
       </Routes>
     </BrowserRouter>
   );

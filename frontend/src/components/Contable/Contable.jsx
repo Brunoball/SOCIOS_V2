@@ -627,7 +627,6 @@ export default function Contable() {
           "Socio",
           "DNI",
           "Categoría",
-          "Modalidad",
           "Período pagado",
           "Medio",
           "Monto",
@@ -637,7 +636,6 @@ export default function Contable() {
           item.socio,
           item.dni,
           item.categoria,
-          item.modalidad,
           item.periodo,
           item.medio,
           item.monto,
@@ -873,7 +871,6 @@ export default function Contable() {
                       "Fecha de cobro",
                       "Socio",
                       "Categoría",
-                      "Concepto",
                       "Período pagado",
                       "Medio",
                       "Monto",
@@ -909,11 +906,6 @@ export default function Contable() {
                         <span className="entity-wrap-text">
                           {item.categoria}
                         </span>
-                      </div>
-                      <div className="mov-gridCell">
-                        {item.modalidad_codigo === "MENSUAL"
-                          ? "CUOTA MENSUAL"
-                          : item.modalidad}
                       </div>
                       <div className="mov-gridCell is-center">
                         {item.periodo}

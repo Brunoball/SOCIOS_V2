@@ -53,13 +53,12 @@
 
 .contable-grid--partners {
   grid-template-columns:
-    minmax(0, 0.75fr)
-    minmax(0, 1.25fr)
+    minmax(0, 0.78fr)
+    minmax(0, 1.35fr)
+    minmax(0, 1.12fr)
     minmax(0, 1fr)
     minmax(0, 0.95fr)
-    minmax(0, 0.85fr)
-    minmax(0, 0.9fr)
-    minmax(0, 0.8fr);
+    minmax(0, 0.82fr);
 }
 
 .contable-grid--income {
@@ -100,7 +99,7 @@
   min-width: 0;
 }
 
-.contable-grid--partners > :nth-child(5),
+.contable-grid--partners > :nth-child(4),
 .contable-grid--expense > :nth-child(3),
 .contable-grid--income > :nth-child(7),
 .contable-grid--expense > :nth-child(8) {
@@ -108,7 +107,7 @@
   text-align: center;
 }
 
-.contable-grid--partners > :nth-child(7),
+.contable-grid--partners > :nth-child(6),
 .contable-grid--income > :nth-child(6),
 .contable-grid--income-readonly > :nth-child(6),
 .contable-grid--expense > :nth-child(7) {

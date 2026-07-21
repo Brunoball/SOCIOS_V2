@@ -21,6 +21,7 @@ import "./AppLayout.css";
 const APP_NAME = "Gestión de Socios";
 
 const NAV_ITEMS = [
+  { key: "administracion", label: "Administración", path: "/panel", icon: faChartLine },
   {
     key: "socios", label: "Socios", path: "/socios", icon: faUsers,
     children: [{ key: "familias", label: "Familias", path: "/socios/familias" }],
@@ -76,7 +77,7 @@ export default function AppLayout() {
       if (child) return child.label;
       if (location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)) return item.label;
     }
-    return "Socios";
+    return "Administración";
   }, [location.pathname]);
 
   const logout = async () => {
@@ -119,14 +120,14 @@ export default function AppLayout() {
       <div className={`pp-drawerOverlay ${drawerOpen ? "is-open" : ""}`} onMouseDown={() => setDrawerOpen(false)} />
       <aside className={`pp-sidebar ${drawerOpen ? "is-drawerOpen" : ""}`}>
         <div className="pp-drawerHeader">
-          <div className="pp-drawerBrand" onClick={() => navigate("/socios")} role="button" tabIndex={0}>
+          <div className="pp-drawerBrand" onClick={() => navigate("/panel")} role="button" tabIndex={0}>
             <div className="pp-drawerBrand__mark"><FontAwesomeIcon icon={faChartLine} /></div>
             <div className="pp-drawerBrand__txt"><div className="pp-drawerBrand__t">{APP_NAME}</div><div className="pp-drawerBrand__s">Administración</div></div>
           </div>
           <button className="pp-drawerClose" type="button" onClick={() => setDrawerOpen(false)}><FontAwesomeIcon icon={faXmark} /></button>
         </div>
 
-        <div className="pp-brand panel_contable" onClick={() => navigate("/socios")} role="button" tabIndex={0}>
+        <div className="pp-brand panel_contable" onClick={() => navigate("/panel")} role="button" tabIndex={0}>
           <div className="pp-brand__mark"><FontAwesomeIcon icon={faChartLine} /></div>
           <div className="pp-brand__text"><div className="pp-brand__title">{APP_NAME}</div><div className="pp-brand__subtitle">Administración</div></div>
         </div>

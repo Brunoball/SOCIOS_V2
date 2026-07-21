@@ -13,6 +13,7 @@ require_once __DIR__ . '/../core/domain.php';
 // Únicamente los módulos actualmente implementados.
 // Auth es obligatorio para el login y la protección de las rutas privadas.
 require_once __DIR__ . '/../modules/auth/routes.php';
+require_once __DIR__ . '/../modules/dashboard/routes.php';
 require_once __DIR__ . '/../modules/socios/routes.php';
 require_once __DIR__ . '/../modules/cuotas/routes.php';
 require_once __DIR__ . '/../modules/categorias/routes.php';
@@ -33,6 +34,7 @@ $router->register('health', 'GET', static function () {
 }, false);
 
 register_auth_routes($router);
+register_dashboard_routes($router);
 register_socios_routes($router);
 register_cuotas_routes($router);
 register_categorias_routes($router);
