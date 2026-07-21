@@ -9,6 +9,7 @@ import {
   faUsers,
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../../Global/components/ModulePage";
+import GlobalDivTable from "../../Global/components/GlobalDivTable";
 import CrudModal from "../../Global/components/CrudModal";
 import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../../Global/components/ModuleFeedback";
@@ -321,106 +322,93 @@ export default function Familias() {
           duration={feedback?.duration}
           onClose={() => setFeedback(null)}
         />
-        <div
-          className="global-divTable familias-table"
-          role="table"
-          aria-label="Listado de familias"
+        <GlobalDivTable
+          className="familias-table"
+          bodyClassName="entity-table-wrap"
+          gridClassName="familias-grid"
+          ariaLabel="Listado de familias"
+          columns={[
+            "Familia",
+            "Descripción",
+            "Integrantes",
+            "Cantidad",
+            "Estado",
+            "Acciones",
+          ]}
         >
-          <div
-            className="mov-tableWrap global-divTable__wrap entity-table-wrap"
-            role="rowgroup"
-          >
-            <div
-              className="mov-gridTable mov-gridTable--head global-divTable__head familias-grid"
-              role="row"
-            >
-              {[
-                "Familia",
-                "Descripción",
-                "Integrantes",
-                "Cantidad",
-                "Estado",
-                "Acciones",
-              ].map((column) => (
-                <div className="mov-gridCell--head" key={column}>
-                  {column}
-                </div>
-              ))}
+          {loading && !items.length ? (
+            <div className="module-empty">
+              <strong>Cargando familias...</strong>
+              <span>Consultando los grupos de la organización.</span>
             </div>
-            {loading && !items.length ? (
-              <div className="module-empty">
-                <strong>Cargando familias...</strong>
-                <span>Consultando los grupos de la organización.</span>
+          ) : null}
+          {!loading && !error && !items.length ? (
+            <div className="module-empty">
+              <strong>Sin familias para mostrar</strong>
+              <span>Creá la primera familia o cambiá los filtros.</span>
+            </div>
+          ) : null}
+          {items.map((item) => (
+            <div
+              className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row familias-grid"
+              role="row"
+              key={item.id_familia}
+            >
+              <div className="mov-gridCell is-strong">{item.nombre}</div>
+              <div className="mov-gridCell">
+                <span className="entity-wrap-text">
+                  {item.descripcion || "—"}
+                </span>
               </div>
-            ) : null}
-            {!loading && !error && !items.length ? (
-              <div className="module-empty">
-                <strong>Sin familias para mostrar</strong>
-                <span>Creá la primera familia o cambiá los filtros.</span>
+              <div className="mov-gridCell">
+                <span className="entity-wrap-text">
+                  {(item.integrantes || [])
+                    .map(
+                      (member) =>
+                        `${member.apellido}, ${member.nombre}${member.activo === false ? " (BAJA)" : ""}`,
+                    )
+                    .join(" · ") || "SIN INTEGRANTES"}
+                </span>
               </div>
-            ) : null}
-            {items.map((item) => (
-              <div
-                className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row familias-grid"
-                role="row"
-                key={item.id_familia}
-              >
-                <div className="mov-gridCell is-strong">{item.nombre}</div>
-                <div className="mov-gridCell">
-                  <span className="entity-wrap-text">
-                    {item.descripcion || "—"}
-                  </span>
-                </div>
-                <div className="mov-gridCell">
-                  <span className="entity-wrap-text">
-                    {(item.integrantes || [])
-                      .map(
-                        (member) =>
-                          `${member.apellido}, ${member.nombre}${member.activo === false ? " (BAJA)" : ""}`,
-                      )
-                      .join(" · ") || "SIN INTEGRANTES"}
-                  </span>
-                </div>
-                <div className="mov-gridCell is-center">
-                  <span className="mov-chip">{item.cantidad_integrantes}</span>
-                </div>
-                <div className="mov-gridCell">
-                  <span
-                    className={`mov-chip ${item.activo ? "mov-chip--ok" : "mov-chip--danger"}`}
-                  >
-                    {item.activo ? "ACTIVA" : "BAJA"}
-                  </span>
-                </div>
-                <div className="mov-gridCell mov-gridCell--actions">
-                  {writable ? (
-                    <div className="mov-actionsInline">
-                      <button
-                        className="mov-iconBtn"
-                        type="button"
-                        title="Editar"
-                        onClick={() => openEdit(item)}
-                      >
-                        <FontAwesomeIcon icon={faPen} />
-                      </button>
-                      <button
-                        className={`mov-iconBtn ${item.activo ? "mov-iconBtn--danger" : ""}`}
-                        type="button"
-                        title={item.activo ? "Dar de baja" : "Reactivar"}
-                        onClick={() => setStateModal(item)}
-                      >
-                        <FontAwesomeIcon
-                          icon={item.activo ? faToggleOff : faRotateLeft}
-                        />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="entity-readonly">CONSULTA</span>
-                  )}
-                </div>
+              <div className="mov-gridCell is-center">
+                <span className="mov-chip">{item.cantidad_integrantes}</span>
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="mov-gridCell">
+                <span
+                  className={`mov-chip ${item.activo ? "mov-chip--ok" : "mov-chip--danger"}`}
+                >
+                  {item.activo ? "ACTIVA" : "BAJA"}
+                </span>
+              </div>
+              <div className="mov-gridCell mov-gridCell--actions">
+                {writable ? (
+                  <div className="mov-actionsInline">
+                    <button
+                      className="mov-iconBtn"
+                      type="button"
+                      title="Editar"
+                      onClick={() => openEdit(item)}
+                    >
+                      <FontAwesomeIcon icon={faPen} />
+                    </button>
+                    <button
+                      className={`mov-iconBtn ${item.activo ? "mov-iconBtn--danger" : ""}`}
+                      type="button"
+                      title={item.activo ? "Dar de baja" : "Reactivar"}
+                      onClick={() => setStateModal(item)}
+                    >
+                      <FontAwesomeIcon
+                        icon={item.activo ? faToggleOff : faRotateLeft}
+                      />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="entity-readonly">CONSULTA</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </GlobalDivTable>
       </ModulePage>
 
       <CrudModal

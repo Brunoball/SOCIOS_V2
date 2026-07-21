@@ -19,6 +19,7 @@ import {
   faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../../Global/components/ModulePage";
+import GlobalDivTable from "../../Global/components/GlobalDivTable";
 import CrudModal from "../../Global/components/CrudModal";
 import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../../Global/components/ModuleFeedback";
@@ -702,6 +703,7 @@ export default function ContableModule({ view = "summary" }) {
       key: "mes",
       label: "Mes",
       type: "select",
+      className: "contable-filter--month",
       value: month,
       onChange: setMonth,
       includeEmptyOption: false,
@@ -725,6 +727,7 @@ export default function ContableModule({ view = "summary" }) {
       key: "categoria",
       label: "Categoría",
       type: "select",
+      className: "contable-filter--category",
       placeholder: "Todas",
       value: category,
       onChange: setCategory,
@@ -737,6 +740,7 @@ export default function ContableModule({ view = "summary" }) {
       key: "medio",
       label: "Medio de pago",
       type: "select",
+      className: "contable-filter--payment",
       placeholder: "Todos",
       value: mean,
       onChange: setMean,
@@ -787,6 +791,42 @@ export default function ContableModule({ view = "summary" }) {
       : view === "expense"
         ? () => openExpense()
         : undefined;
+  const tableColumns =
+    view === "income" && incomeTab === "partners"
+      ? [
+          "Fecha de cobro",
+          "Socio",
+          "Categoría",
+          "Período pagado",
+          "Medio",
+          "Monto",
+        ]
+      : view === "income"
+        ? [
+            "Fecha",
+            "Medio",
+            "Persona / Proveedor",
+            "Categoría",
+            "Descripción / concepto",
+            "Importe",
+            ...(writable ? ["Acciones"] : []),
+          ]
+        : [
+            "Fecha",
+            "Categoría",
+            "N.º comprobante",
+            "Descripción",
+            "Proveedor",
+            "Medio",
+            "Monto",
+            "Acciones",
+          ];
+  const tableGridClassName =
+    view === "income" && incomeTab === "partners"
+      ? "contable-grid contable-grid--partners"
+      : view === "income"
+        ? `contable-grid ${writable ? "contable-grid--income" : "contable-grid--income-readonly"}`
+        : "contable-grid contable-grid--expense";
 
   return (
     <>
@@ -799,9 +839,7 @@ export default function ContableModule({ view = "summary" }) {
               : "Egresos"
         }
         description={
-          view === "expense"
-            ? "Administración de gastos"
-            : undefined
+          view === "expense" ? "Administración de gastos" : undefined
         }
         filters={pageFilters}
         tabsInTitle={view === "summary" || view === "income"}
@@ -811,9 +849,7 @@ export default function ContableModule({ view = "summary" }) {
         }
         onPrimaryAction={openMovement}
         canCreate={canCreateMovement}
-        primaryActionClassName={
-          canCreateMovement ? "contable-create-top" : ""
-        }
+        primaryActionClassName={canCreateMovement ? "contable-create-top" : ""}
         secondaryActions={
           view === "summary"
             ? []
@@ -843,36 +879,18 @@ export default function ContableModule({ view = "summary" }) {
         {view === "summary" ? (
           <SummaryView summary={summary} loading={loading} mode={summaryMode} />
         ) : (
-          <div
-            className="global-divTable contable-table"
-            role="table"
-            aria-label={
-              view === "income" ? "Listado de ingresos" : "Listado de egresos"
-            }
-          >
-            <div
-              className="mov-tableWrap global-divTable__wrap entity-table-wrap"
-              role="rowgroup"
+          <div className="contable-table">
+            <GlobalDivTable
+              className="contable-table__data"
+              bodyClassName="entity-table-wrap"
+              gridClassName={tableGridClassName}
+              columns={tableColumns}
+              ariaLabel={
+                view === "income" ? "Listado de ingresos" : "Listado de egresos"
+              }
             >
               {view === "income" && incomeTab === "partners" ? (
                 <>
-                  <div
-                    className="mov-gridTable mov-gridTable--head global-divTable__head contable-grid contable-grid--partners"
-                    role="row"
-                  >
-                    {[
-                      "Fecha de cobro",
-                      "Socio",
-                      "Categoría",
-                      "Período pagado",
-                      "Medio",
-                      "Monto",
-                    ].map((column) => (
-                      <div className="mov-gridCell--head" key={column}>
-                        {column}
-                      </div>
-                    ))}
-                  </div>
                   {!data.items?.length ? (
                     <EmptyState
                       loading={loading}
@@ -914,24 +932,6 @@ export default function ContableModule({ view = "summary" }) {
 
               {view === "income" && incomeTab === "manual" ? (
                 <>
-                  <div
-                    className={`mov-gridTable mov-gridTable--head global-divTable__head contable-grid ${writable ? "contable-grid--income" : "contable-grid--income-readonly"}`}
-                    role="row"
-                  >
-                    {[
-                      "Fecha",
-                      "Medio",
-                      "Persona / Proveedor",
-                      "Categoría",
-                      "Descripción / concepto",
-                      "Importe",
-                      ...(writable ? ["Acciones"] : []),
-                    ].map((column) => (
-                      <div className="mov-gridCell--head" key={column}>
-                        {column}
-                      </div>
-                    ))}
-                  </div>
                   {!data.items?.length ? (
                     <EmptyState
                       loading={loading}
@@ -988,25 +988,6 @@ export default function ContableModule({ view = "summary" }) {
 
               {view === "expense" ? (
                 <>
-                  <div
-                    className="mov-gridTable mov-gridTable--head global-divTable__head contable-grid contable-grid--expense"
-                    role="row"
-                  >
-                    {[
-                      "Fecha",
-                      "Categoría",
-                      "N.º comprobante",
-                      "Descripción",
-                      "Proveedor",
-                      "Medio",
-                      "Monto",
-                      "Acciones",
-                    ].map((column) => (
-                      <div className="mov-gridCell--head" key={column}>
-                        {column}
-                      </div>
-                    ))}
-                  </div>
                   {!data.items?.length ? (
                     <EmptyState
                       loading={loading}
@@ -1078,7 +1059,7 @@ export default function ContableModule({ view = "summary" }) {
                   ))}
                 </>
               ) : null}
-            </div>
+            </GlobalDivTable>
 
             <div className="contable-table-footer">
               {summaryCategories.length ? (

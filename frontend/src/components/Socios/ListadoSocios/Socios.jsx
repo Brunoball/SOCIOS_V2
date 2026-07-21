@@ -17,6 +17,7 @@ import {
   faWallet,
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../../Global/components/ModulePage";
+import GlobalDivTable from "../../Global/components/GlobalDivTable";
 import CrudModal from "../../Global/components/CrudModal";
 import InfoModal, {
   InfoEmpty,
@@ -564,127 +565,112 @@ export default function Socios() {
           duration={feedback?.duration}
           onClose={() => setFeedback(null)}
         />
-        <div
-          className="global-divTable socios-table"
-          role="table"
-          aria-label="Listado de socios"
+        <GlobalDivTable
+          className="socios-table"
+          bodyClassName="entity-table-wrap"
+          gridClassName="socios-grid"
+          ariaLabel="Listado de socios"
+          columns={[
+            "Socio",
+            "DNI",
+            "Categorías",
+            "Familia",
+            "Contacto",
+            "Ingreso",
+            "Estado",
+            "Acciones",
+          ]}
         >
-          <div
-            className="mov-tableWrap global-divTable__wrap entity-table-wrap"
-            role="rowgroup"
-          >
-            <div
-              className="mov-gridTable mov-gridTable--head global-divTable__head socios-grid"
-              role="row"
-            >
-              {[
-                "Socio",
-                "DNI",
-                "Categorías",
-                "Familia",
-                "Contacto",
-                "Ingreso",
-                "Estado",
-                "Acciones",
-              ].map((column) => (
-                <div className="mov-gridCell--head" key={column}>
-                  {column}
-                </div>
-              ))}
+          {loading && !items.length ? (
+            <div className="module-empty">
+              <strong>Cargando socios...</strong>
+              <span>Consultando el padrón de la organización.</span>
             </div>
-            {loading && !items.length ? (
-              <div className="module-empty">
-                <strong>Cargando socios...</strong>
-                <span>Consultando el padrón de la organización.</span>
+          ) : null}
+          {!loading && !error && !items.length ? (
+            <div className="module-empty">
+              <strong>Sin socios para mostrar</strong>
+              <span>Creá el primer socio o cambiá los filtros aplicados.</span>
+            </div>
+          ) : null}
+          {items.map((item) => (
+            <div
+              className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row socios-grid"
+              role="row"
+              key={item.id_socio}
+            >
+              <div className="mov-gridCell entity-main-cell">
+                <strong>
+                  {item.apellido}, {item.nombre}
+                </strong>
+                <small>
+                  {item.localidad}
+                  {item.domicilio ? ` · ${item.domicilio}` : ""}
+                </small>
               </div>
-            ) : null}
-            {!loading && !error && !items.length ? (
-              <div className="module-empty">
-                <strong>Sin socios para mostrar</strong>
-                <span>
-                  Creá el primer socio o cambiá los filtros aplicados.
+              <div className="mov-gridCell is-strong">{item.dni}</div>
+              <div className="mov-gridCell">
+                <span className="entity-wrap-text">
+                  {item.categorias || "SIN CATEGORÍA"}
                 </span>
               </div>
-            ) : null}
-            {items.map((item) => (
-              <div
-                className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row socios-grid"
-                role="row"
-                key={item.id_socio}
-              >
-                <div className="mov-gridCell entity-main-cell">
-                  <strong>
-                    {item.apellido}, {item.nombre}
-                  </strong>
-                  <small>
-                    {item.localidad}
-                    {item.domicilio ? ` · ${item.domicilio}` : ""}
-                  </small>
-                </div>
-                <div className="mov-gridCell is-strong">{item.dni}</div>
-                <div className="mov-gridCell">
-                  <span className="entity-wrap-text">
-                    {item.categorias || "SIN CATEGORÍA"}
-                  </span>
-                </div>
-                <div className="mov-gridCell">{item.familia || "—"}</div>
-                <div className="mov-gridCell entity-main-cell">
-                  <span>{item.telefono || "—"}</span>
-                  <small>{item.email || ""}</small>
-                </div>
-                <div className="mov-gridCell">
-                  {formatDate(item.fecha_ingreso)}
-                </div>
-                <div className="mov-gridCell">
-                  <span
-                    className={`mov-chip ${item.activo ? "mov-chip--ok" : "mov-chip--danger"}`}
+              <div className="mov-gridCell">{item.familia || "—"}</div>
+              <div className="mov-gridCell entity-main-cell">
+                <span>{item.telefono || "—"}</span>
+                <small>{item.email || ""}</small>
+              </div>
+              <div className="mov-gridCell">
+                {formatDate(item.fecha_ingreso)}
+              </div>
+              <div className="mov-gridCell">
+                <span
+                  className={`mov-chip ${item.activo ? "mov-chip--ok" : "mov-chip--danger"}`}
+                >
+                  {item.activo ? "ACTIVO" : "BAJA"}
+                </span>
+              </div>
+              <div className="mov-gridCell mov-gridCell--actions">
+                <div className="mov-actionsInline">
+                  <button
+                    className="mov-iconBtn"
+                    type="button"
+                    title="Ver ficha e historial"
+                    onClick={() => openHistory(item)}
                   >
-                    {item.activo ? "ACTIVO" : "BAJA"}
-                  </span>
-                </div>
-                <div className="mov-gridCell mov-gridCell--actions">
-                  <div className="mov-actionsInline">
-                    <button
-                      className="mov-iconBtn"
-                      type="button"
-                      title="Ver ficha e historial"
-                      onClick={() => openHistory(item)}
-                    >
-                      <FontAwesomeIcon icon={faCircleInfo} />
-                    </button>
-                    {writable ? (
-                      <>
-                        <button
-                          className="mov-iconBtn"
-                          type="button"
-                          title="Editar"
-                          onClick={() => openEdit(item)}
-                        >
-                          <FontAwesomeIcon icon={faPen} />
-                        </button>
-                        <button
-                          className={`mov-iconBtn ${item.activo ? "mov-iconBtn--danger" : ""}`}
-                          type="button"
-                          title={item.activo ? "Dar de baja" : "Reactivar"}
-                          onClick={() => {
-                            setStateForm({
-                              fecha_baja: dateToday(),
-                            });
-                            setStateModal(item);
-                          }}
-                        >
-                          <FontAwesomeIcon
-                            icon={item.activo ? faUserSlash : faRotateLeft}
-                          />
-                        </button>
-                      </>
-                    ) : null}
-                  </div>
+                    <FontAwesomeIcon icon={faCircleInfo} />
+                  </button>
+                  {writable ? (
+                    <>
+                      <button
+                        className="mov-iconBtn"
+                        type="button"
+                        title="Editar"
+                        onClick={() => openEdit(item)}
+                      >
+                        <FontAwesomeIcon icon={faPen} />
+                      </button>
+                      <button
+                        className={`mov-iconBtn ${item.activo ? "mov-iconBtn--danger" : ""}`}
+                        type="button"
+                        title={item.activo ? "Dar de baja" : "Reactivar"}
+                        onClick={() => {
+                          setStateForm({
+                            fecha_baja: dateToday(),
+                          });
+                          setStateModal(item);
+                        }}
+                      >
+                        <FontAwesomeIcon
+                          icon={item.activo ? faUserSlash : faRotateLeft}
+                        />
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
+          ))}
+        </GlobalDivTable>
       </ModulePage>
 
       <CrudModal

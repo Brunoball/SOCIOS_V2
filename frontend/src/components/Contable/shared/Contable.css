@@ -12,15 +12,30 @@
   flex: 1 1 145px;
 }
 
-.contable-head-filters > .contable-filter--year {
+.contable-head-filters > .contable-filter--year,
+.contable-head-filters > .contable-filter--month {
   width: 100%;
   flex: 0 0 120px;
   max-width: 120px;
 }
 
-.contable-head-filters > .contable-filter--year select {
+.contable-head-filters > .contable-filter--year select,
+.contable-head-filters > .contable-filter--month select {
   width: 100%;
   max-width: 120px;
+}
+
+.contable-head-filters > .contable-filter--category,
+.contable-head-filters > .contable-filter--payment {
+  width: 100%;
+  flex: 0 1 140px;
+  max-width: 140px;
+}
+
+.contable-head-filters > .contable-filter--category select,
+.contable-head-filters > .contable-filter--payment select {
+  width: 100%;
+  max-width: 140px;
 }
 
 .contable-head-filters .module-filter--search {
@@ -35,14 +50,23 @@
 .contable-table .entity-table-wrap {
   width: 100%;
   max-width: 100%;
-  min-height: 260px;
+  min-height: 0 !important;
+  max-height: calc(100vh - 300px) !important;
   overflow-x: hidden !important;
 }
 
 .contable-table {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
   max-width: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
+}
+
+.contable-table__data {
+  min-height: 0;
 }
 
 .contable-grid {
@@ -315,7 +339,8 @@
 
 .ct-month-table-panel {
   min-width: 0;
-  min-height: 0;  align-self: start;
+  min-height: 0;
+  align-self: start;
   display: flex;
   flex-direction: column;
 }
@@ -609,7 +634,8 @@
     max-width: none;
   }
 
-  .contable-head-filters > .contable-filter--year {
+  .contable-head-filters > .contable-filter--year,
+  .contable-head-filters > .contable-filter--month {
     width: 120px;
     flex-basis: 120px;
   }

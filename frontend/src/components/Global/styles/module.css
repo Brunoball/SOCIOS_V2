@@ -671,6 +671,7 @@
   width: 100%;
   min-height: 0;
   flex: 1;
+  overflow: hidden;
 }
 
 .global-divTable__head,
@@ -678,8 +679,20 @@
   min-width: 100%;
 }
 
+.global-divTable > .global-divTable__head {
+  position: relative;
+  top: auto;
+  z-index: 2;
+  flex: 0 0 auto;
+  width: 100%;
+  padding-inline-end: var(--global-table-scrollbar-width, 0px);
+}
+
 .global-divTable__wrap {
   width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: auto;
 }
 
 .global-divTable__body {
@@ -1093,7 +1106,7 @@
 
 .module-card .global-divTable > .mov-tableWrap {
   min-height: 280px;
-  max-height: calc(100vh - 150px);
+  max-height: calc(100vh - 240px);
 }
 
 .module-empty {
@@ -1226,7 +1239,8 @@
 .entity-table-wrap {
   min-height: 280px;
   max-height: none;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 .entity-table-row .mov-gridCell {
   min-height: 62px;
