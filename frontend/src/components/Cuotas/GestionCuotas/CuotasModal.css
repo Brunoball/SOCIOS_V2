@@ -1,4 +1,4 @@
-/* Layouts y componentes exclusivos de los modales de Cuotas. */
+/* Layouts exclusivos de los modales de Cuotas. */
 .cuotas-modal--picker.entity-modal {
   width: min(640px, 100%);
 }
@@ -61,201 +61,232 @@
   line-height: 1.45;
 }
 
+/* Modal de cobro simplificado: una sola pantalla y total fijo en el pie. */
 .cuotas-modal--payment.entity-modal {
-  width: min(980px, 100%);
+  width: min(920px, 100%);
 }
 
 .cuotas-modal--payment .entity-modal__body {
-  padding: 14px 20px 18px;
+  padding: 15px 20px 18px;
 }
 
-.cuotas-payment-form {
-  display: grid;
-  gap: 0;
+.cuotas-modal--payment .entity-modal__footer {
+  align-items: center;
+  gap: 16px;
 }
 
-.cuotas-payment-panel__body,
-.cuotas-checkout-panel__body {
-  display: grid;
-  gap: 14px;
-}
-
-.cuotas-payment-panel__next {
-  display: flex;
-  justify-content: flex-end;
-  padding-top: 2px;
-}
-
-.cuotas-payment-panel__next .mov-btn {
-  min-width: 164px;
-  height: 39px;
-  font-size: 12px;
-}
-
-.cuotas-checkout-summary {
-  display: grid;
-  grid-template-columns: 0.7fr 1.3fr 1fr;
-  gap: 9px;
-}
-
-.cuotas-checkout-summary > div {
+.cuotas-modal--payment .entity-modal__footer-start {
   min-width: 0;
-  padding: 12px 13px;
-  border: 1px solid rgba(58, 46, 43, 0.1);
-  border-radius: 12px;
-  background: rgba(253, 251, 247, 0.72);
+  margin-right: auto;
 }
 
-.cuotas-checkout-summary span {
-  display: block;
-  color: var(--entity-modal-text);
+.cuotas-modal--payment .entity-modal__footer .mov-btn {
+  min-width: 128px;
+  height: 40px;
+}
+
+.cuotas-payment-form,
+.cuotas-payment-content {
+  display: grid;
+  gap: 13px;
+}
+
+.cuotas-payment-person {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.72fr) minmax(0, 1.55fr);
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid rgba(196, 139, 59, 0.25);
+  border-radius: 14px;
+  background: rgba(196, 139, 59, 0.065);
+}
+
+.cuotas-payment-person__identity {
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  padding: 13px 15px;
+  border-right: 1px solid rgba(196, 139, 59, 0.2);
+  border-left: 4px solid var(--balto-action);
+  background: rgba(255, 255, 255, 0.66);
+}
+
+.cuotas-payment-person__identity > span {
+  color: var(--balto-action);
   font-size: 9px;
-  font-weight: 760;
-  letter-spacing: 0.055em;
+  font-weight: 800;
+  letter-spacing: 0.075em;
   text-transform: uppercase;
 }
 
-.cuotas-checkout-summary strong {
-  display: block;
-  margin-top: 5px;
+.cuotas-payment-person__identity strong {
   overflow: hidden;
-  color: var(--entity-modal-ink);
-  font-size: 14px;
+  color: var(--balto-ink);
+  font-size: 15px;
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cuotas-checkout-summary > div:last-child strong {
-  color: var(--entity-modal-action);
-  font-size: 16px;
+.cuotas-payment-person__identity small,
+.cuotas-payment-person__family span,
+.cuotas-payment-person__single {
+  color: var(--balto-text);
+  font-size: 11px;
 }
 
-.cuotas-family-box {
+.cuotas-payment-person__family {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 14px;
-  border: 1px solid rgba(196, 139, 59, 0.28);
-  border-radius: 14px;
-  background: rgba(196, 139, 59, 0.08);
+  gap: 16px;
+  padding: 12px 14px;
 }
 
-.cuotas-family-box > div {
+.cuotas-payment-person__family > div {
   min-width: 0;
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
-.cuotas-family-box strong {
+.cuotas-payment-person__family strong {
   color: var(--balto-ink);
-}
-
-.cuotas-family-box span {
-  color: var(--balto-text);
   font-size: 12px;
-  line-height: 1.4;
 }
 
-.cuotas-family-box small {
+.cuotas-payment-person__family span {
+  overflow: hidden;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cuotas-payment-person__family small {
   color: var(--balto-action);
-  font-size: 11px;
-  font-weight: 650;
+  font-size: 10px;
+  font-weight: 700;
 }
 
-.cuotas-family-box > label {
+.cuotas-payment-person__family label {
   flex: 0 0 auto;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
   color: var(--balto-ink);
-  font-size: 12px;
-  font-weight: 650;
+  font-size: 11px;
+  font-weight: 680;
   cursor: pointer;
+  white-space: nowrap;
 }
 
-.cuotas-family-box input,
+.cuotas-payment-person__family input,
 .cuotas-condone-toggle input {
-  width: 17px;
-  height: 17px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
   accent-color: var(--balto-action);
 }
 
-.cuotas-modal-tabs {
-  width: fit-content;
-}
-
-.cuotas-payment-controls {
-  margin-top: -4px;
-}
-
-.cuotas-year-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  gap: 8px;
-}
-
-.cuotas-enable-year {
-  min-width: 118px;
-  height: 38px;
-  margin-bottom: 1px;
-  white-space: nowrap;
-}
-
-.cuotas-year-enabled {
-  align-self: end;
-  min-height: 38px;
+.cuotas-payment-person__single {
   display: flex;
   align-items: center;
-  padding: 0 10px;
-  border: 1px solid rgba(55, 145, 86, 0.24);
-  border-radius: 9px;
-  color: #287a45;
-  background: rgba(55, 145, 86, 0.08);
-  font-size: 10px;
-  font-weight: 750;
-  white-space: nowrap;
+  padding: 13px 15px;
 }
 
-.cuotas-quick-actions {
+.cuotas-payment-concept-tabs {
   display: flex;
-  gap: 7px;
-  flex-wrap: wrap;
+  align-items: end;
+  gap: 2px;
+  min-height: 38px;
+  border-bottom: 1px solid var(--mov-border);
 }
 
-.cuotas-quick-actions button {
-  min-height: 32px;
-  padding: 6px 10px;
-  border: 1px solid var(--mov-border);
-  border-radius: 9px;
+.cuotas-payment-concept-tabs button {
+  min-width: 112px;
+  min-height: 38px;
+  margin: 0 0 -1px;
+  padding: 8px 15px;
+  border: 1px solid transparent;
+  border-bottom-color: var(--mov-border);
+  border-radius: 10px 10px 0 0;
   color: var(--balto-text);
-  background: #fff;
+  background: transparent;
   font: inherit;
-  font-size: 11px;
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 680;
   cursor: pointer;
+  transition: 150ms ease;
 }
 
-.cuotas-quick-actions button:hover {
-  color: var(--balto-action);
-  border-color: rgba(196, 139, 59, 0.42);
-  background: rgba(196, 139, 59, 0.06);
+.cuotas-payment-concept-tabs button:hover:not(:disabled) {
+  color: var(--balto-ink);
+  background: rgba(196, 139, 59, 0.045);
+}
+
+.cuotas-payment-concept-tabs button.is-active {
+  color: var(--balto-ink);
+  border-color: var(--mov-border);
+  border-bottom-color: #fff;
+  background: #fff;
+  box-shadow: inset 0 3px 0 var(--balto-action);
+}
+
+.cuotas-payment-concept-tabs button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.cuotas-payment-content {
+  padding-top: 1px;
+}
+
+.cuotas-payment-controls--compact {
+  grid-template-columns: minmax(0, 1fr) minmax(130px, 0.55fr);
+  gap: 11px;
+}
+
+.cuotas-payment-controls--compact.has-modality {
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.48fr) minmax(210px, 1fr);
+}
+
+.cuotas-payment-modality-field {
+  min-width: 0;
+}
+
+.cuotas-package-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 11px;
+  border: 1px solid rgba(196, 139, 59, 0.24);
+  border-radius: 10px;
+  background: rgba(196, 139, 59, 0.065);
+}
+
+.cuotas-package-notice strong {
+  color: var(--balto-ink);
+  font-size: 11px;
+}
+
+.cuotas-package-notice span {
+  color: var(--balto-text);
+  font-size: 10px;
 }
 
 .cuotas-period-list {
-  max-height: 310px;
   display: grid;
-  gap: 11px;
-  overflow-y: auto;
-  padding-right: 4px;
+  gap: 9px;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .cuotas-period-group {
   overflow: hidden;
   border: 1px solid var(--mov-border);
-  border-radius: 13px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--balto-bg) 35%, #fff);
 }
 
@@ -263,40 +294,41 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  padding: 9px 11px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--mov-border);
   background: #fff;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .cuotas-period-group > header span {
   color: var(--balto-action);
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .cuotas-month-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(92px, 1fr));
+  grid-template-columns: repeat(6, minmax(88px, 1fr));
   gap: 7px;
   padding: 9px;
 }
 
 .cuotas-month-grid button {
-  min-height: 60px;
+  min-height: 62px;
   display: grid;
   place-items: center;
   gap: 2px;
   padding: 6px;
   border: 1px solid var(--mov-border);
-  border-radius: 10px;
+  border-radius: 9px;
   color: var(--balto-ink);
   background: #fff;
   cursor: pointer;
   font-family: inherit;
+  transition: 150ms ease;
 }
 
 .cuotas-month-grid button strong {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .cuotas-month-grid button span {
@@ -308,25 +340,24 @@
 .cuotas-month-grid button small {
   color: var(--balto-action);
   font-size: 8px;
-  font-weight: 750;
+  font-weight: 780;
 }
 
 .cuotas-month-grid button:hover:not(:disabled),
 .cuotas-month-grid button.is-selected {
-  border-color: rgba(196, 139, 59, 0.55);
-  background: rgba(196, 139, 59, 0.11);
-  box-shadow: 0 7px 16px -14px rgba(196, 139, 59, 0.8);
+  border-color: rgba(196, 139, 59, 0.58);
+  background: rgba(196, 139, 59, 0.1);
 }
 
 .cuotas-month-grid button.is-selected {
-  outline: 2px solid rgba(196, 139, 59, 0.2);
+  box-shadow: inset 0 0 0 1px rgba(196, 139, 59, 0.2);
 }
 
 .cuotas-month-grid button.is-disabled {
   color: #888;
-  background: #f0efee;
+  background: #f1f0ef;
   cursor: not-allowed;
-  opacity: 0.72;
+  opacity: 0.68;
 }
 
 .cuotas-month-grid button.is-disabled span {
@@ -334,44 +365,47 @@
   font-size: 9px;
 }
 
-.cuotas-selection-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.cuotas-selection-summary > div {
-  padding: 10px 11px;
-  border: 1px solid var(--mov-border);
-  border-radius: 11px;
-  background: #fff;
-}
-
-.cuotas-selection-summary span {
-  display: block;
-  color: var(--balto-text);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.cuotas-selection-summary strong {
-  display: block;
-  margin-top: 4px;
+.cuotas-month-grid button.is-package.is-selected:disabled {
+  border-color: rgba(196, 139, 59, 0.55);
   color: var(--balto-ink);
-  font-size: 15px;
+  background: rgba(196, 139, 59, 0.12);
+  cursor: default;
+  opacity: 1;
 }
 
 .cuotas-registration-box {
   display: grid;
-  gap: 12px;
+  grid-template-columns: minmax(170px, 0.55fr) minmax(0, 1.45fr);
+  gap: 10px;
+}
+
+.cuotas-registration-amount {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(196, 139, 59, 0.22);
+  border-radius: 11px;
+  background: rgba(196, 139, 59, 0.065);
+}
+
+.cuotas-registration-amount span {
+  color: var(--balto-text);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.cuotas-registration-amount strong {
+  color: var(--balto-action);
+  font-size: 18px;
 }
 
 .cuotas-registration-members {
-  max-height: 180px;
+  max-height: 190px;
   display: grid;
-  gap: 7px;
+  gap: 6px;
   overflow-y: auto;
 }
 
@@ -382,159 +416,60 @@
   gap: 12px;
   padding: 9px 11px;
   border: 1px solid var(--mov-border);
-  border-radius: 10px;
+  border-radius: 9px;
   background: #fff;
-  font-size: 12px;
+  font-size: 11px;
 }
 
-.cuotas-payment-data {
+.cuotas-payment-data--compact {
   display: grid;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid rgba(58, 46, 43, 0.1);
-  border-radius: 14px;
-  background: #fff;
+  gap: 9px;
+  padding-top: 12px;
+  border-top: 1px solid var(--mov-border);
 }
 
-.cuotas-condone-toggle {
-  display: flex;
+.cuotas-payment-data--compact .entity-form__grid {
+  gap: 11px;
+}
+
+.cuotas-condone-toggle--compact {
+  width: fit-content;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  padding: 11px 12px;
-  border: 1px solid rgba(225, 61, 69, 0.22);
-  border-radius: 12px;
-  background: rgba(225, 61, 69, 0.06);
+  gap: 7px;
+  color: var(--balto-text);
+  font-size: 10px;
+  font-weight: 650;
   cursor: pointer;
 }
 
-.cuotas-condone-toggle > span {
+.cuotas-payment-footer-total {
+  min-width: 0;
   display: grid;
-  gap: 2px;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  column-gap: 9px;
+  row-gap: 1px;
 }
 
-.cuotas-condone-toggle strong {
-  color: var(--balto-ink);
-  font-size: 12px;
-}
-
-.cuotas-condone-toggle small {
+.cuotas-payment-footer-total > span {
   color: var(--balto-text);
   font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
 }
 
-@media (max-width: 900px) {
-  .cuotas-family-box {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .cuotas-month-grid {
-    grid-template-columns: repeat(3, minmax(84px, 1fr));
-  }
-
-  .cuotas-selection-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .cuotas-checkout-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .cuotas-checkout-summary > div:last-child {
-    grid-column: 1 / -1;
-  }
-}
-
-@media (max-width: 720px) {
-  .cuotas-modal--picker .entity-modal__body,
-  .cuotas-modal--payment .entity-modal__body {
-    padding: 10px 13px 14px;
-  }
-
-  .cuotas-picker-card {
-    grid-template-columns: 1fr;
-    padding: 13px;
-  }
-
-  .cuotas-picker-card__icon {
-    display: none;
-  }
-
-  .cuotas-year-control {
-    grid-template-columns: 1fr;
-  }
-
-  .cuotas-enable-year,
-  .cuotas-year-enabled {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .cuotas-month-grid {
-    grid-template-columns: repeat(2, minmax(82px, 1fr));
-  }
-
-  .cuotas-checkout-summary {
-    grid-template-columns: 1fr;
-  }
-
-  .cuotas-checkout-summary > div:last-child {
-    grid-column: auto;
-  }
-
-  .cuotas-payment-panel__next .mov-btn {
-    width: 100%;
-  }
-}
-
-/* Modalidades de cobro: mensual, inscripción y paquetes semestrales/anuales. */
-.cuotas-payment-controls {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr);
-}
-
-.cuotas-modality-help {
-  min-height: 34px;
-  display: flex;
-  align-items: center;
-  padding: 8px 11px;
-  border: 1px solid color-mix(in srgb, var(--mov-border) 82%, #fff);
-  border-radius: 10px;
-  color: var(--balto-text);
-  background: color-mix(in srgb, var(--balto-bg) 42%, #fff);
-  font-size: 10px;
-  line-height: 1.45;
-}
-
-.cuotas-modality-help strong {
+.cuotas-payment-footer-total > strong {
   color: var(--balto-action);
+  font-size: 21px;
+  line-height: 1;
 }
 
-.cuotas-package-notice {
-  display: grid;
-  gap: 3px;
-  padding: 11px 12px;
-  border: 1px solid rgba(196, 139, 59, 0.3);
-  border-radius: 11px;
-  background: rgba(196, 139, 59, 0.08);
-}
-
-.cuotas-package-notice strong {
-  color: var(--balto-ink);
-  font-size: 12px;
-}
-
-.cuotas-package-notice span {
+.cuotas-payment-footer-total > small {
+  grid-column: 1 / -1;
   color: var(--balto-text);
-  font-size: 10px;
-  line-height: 1.45;
-}
-
-.cuotas-month-grid button.is-package.is-selected:disabled {
-  border-color: rgba(196, 139, 59, 0.55);
-  color: var(--balto-ink);
-  background: rgba(196, 139, 59, 0.12);
-  cursor: default;
-  opacity: 1;
+  font-size: 9px;
 }
 
 .cuotas-delete-package-warning {
@@ -555,56 +490,87 @@
   margin: 0;
 }
 
-@media (max-width: 980px) {
-  .cuotas-payment-controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 900px) {
+  .cuotas-payment-person {
+    grid-template-columns: 1fr;
   }
 
-  .cuotas-year-control {
+  .cuotas-payment-person__identity {
+    border-right: 0;
+    border-bottom: 1px solid rgba(196, 139, 59, 0.2);
+  }
+
+  .cuotas-payment-controls--compact.has-modality {
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 0.55fr);
+  }
+
+  .cuotas-payment-controls--compact.has-modality .cuotas-payment-modality-field {
     grid-column: 1 / -1;
+  }
+
+  .cuotas-month-grid {
+    grid-template-columns: repeat(3, minmax(84px, 1fr));
   }
 }
 
 @media (max-width: 720px) {
-  .cuotas-payment-controls {
+  .cuotas-modal--picker .entity-modal__body,
+  .cuotas-modal--payment .entity-modal__body {
+    padding: 11px 13px 14px;
+  }
+
+  .cuotas-picker-card {
+    grid-template-columns: 1fr;
+    padding: 13px;
+  }
+
+  .cuotas-picker-card__icon {
+    display: none;
+  }
+
+  .cuotas-payment-person__family {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cuotas-payment-person__family span {
+    white-space: normal;
+  }
+
+  .cuotas-payment-concept-tabs button {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .cuotas-payment-controls--compact,
+  .cuotas-payment-controls--compact.has-modality,
+  .cuotas-payment-data--compact .entity-form__grid,
+  .cuotas-registration-box {
     grid-template-columns: 1fr;
   }
 
-  .cuotas-year-control {
+  .cuotas-payment-controls--compact.has-modality .cuotas-payment-modality-field {
     grid-column: auto;
   }
-}
 
-.cuotas-modality-selector {
-  display: grid;
-  grid-template-columns: minmax(260px, 0.72fr) minmax(280px, 1.28fr);
-  gap: 14px;
-  align-items: end;
-  padding: 14px;
-  border: 1px solid rgba(196, 139, 59, 0.36);
-  border-radius: 13px;
-  background: rgba(196, 139, 59, 0.08);
-}
+  .cuotas-month-grid {
+    grid-template-columns: repeat(2, minmax(82px, 1fr));
+  }
 
-.cuotas-modality-selector .entity-field {
-  margin: 0;
-}
+  .cuotas-package-notice {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 
-.cuotas-modality-selector select {
-  min-height: 47px;
-  font-weight: 700;
-}
+  .cuotas-modal--payment .entity-modal__footer {
+    flex-wrap: wrap;
+  }
 
-.cuotas-modality-selector small {
-  align-self: center;
-  color: var(--balto-text);
-  font-size: 10px;
-  line-height: 1.5;
-}
+  .cuotas-modal--payment .entity-modal__footer-start {
+    width: 100%;
+  }
 
-@media (max-width: 760px) {
-  .cuotas-modality-selector {
-    grid-template-columns: 1fr;
-    align-items: stretch;
+  .cuotas-modal--payment .entity-modal__footer .mov-btn {
+    width: 100%;
   }
 }

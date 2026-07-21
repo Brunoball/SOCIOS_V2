@@ -16,7 +16,10 @@ export default function CrudModal({
   danger = false,
   wide = false,
   hideSubmit = false,
+  submitDisabled = false,
+  hideCancel = false,
   cancelLabel = "Cancelar",
+  footerStart = null,
   modalClassName = "",
 }) {
   useEffect(() => {
@@ -63,19 +66,24 @@ export default function CrudModal({
         <form onSubmit={onSubmit}>
           <div className="entity-modal__body">{children}</div>
           <footer className="entity-modal__footer">
-            <button
-              className="mov-btn mov-btn--ghost"
-              type="button"
-              onClick={onClose}
-              disabled={saving}
-            >
-              {cancelLabel}
-            </button>
+            {footerStart ? (
+              <div className="entity-modal__footer-start">{footerStart}</div>
+            ) : null}
+            {!hideCancel ? (
+              <button
+                className="mov-btn mov-btn--ghost"
+                type="button"
+                onClick={onClose}
+                disabled={saving}
+              >
+                {cancelLabel}
+              </button>
+            ) : null}
             {!hideSubmit ? (
               <button
                 className={`mov-btn ${danger ? "mov-btn--danger" : "mov-btn--primary"}`}
                 type="submit"
-                disabled={saving}
+                disabled={saving || submitDisabled}
               >
                 {saving ? "Guardando..." : submitLabel}
               </button>

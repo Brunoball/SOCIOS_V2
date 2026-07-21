@@ -31,7 +31,7 @@ abstract class CuotasRegistros extends CuotasConsultas
             $partnerId = positive_id($obligation['id_socio'] ?? null, 'socio');
             $categoryId = positive_id($obligation['id_categoria'] ?? null, 'categoría');
             $year = filter_var($obligation['anio'] ?? null, FILTER_VALIDATE_INT, [
-                'options' => ['min_range' => 2000, 'max_range' => (int)date('Y')],
+                'options' => ['min_range' => 2000, 'max_range' => self::maximumEnabledYear()],
             ]);
             $month = filter_var($obligation['id_mes'] ?? null, FILTER_VALIDATE_INT, [
                 'options' => ['min_range' => 1, 'max_range' => 12],
@@ -317,7 +317,7 @@ abstract class CuotasRegistros extends CuotasConsultas
         $db = $auth['db'];
         $principalId = positive_id($body['id_socio'] ?? null, 'socio');
         $categoryId = positive_id($body['id_categoria'] ?? null, 'categoría');
-        $year = filter_var($body['anio'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 2000, 'max_range' => (int)date('Y')]]);
+        $year = filter_var($body['anio'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 2000, 'max_range' => self::maximumEnabledYear()]]);
         if ($year === false) api_error('El año de inscripción no es válido.', 'VALIDATION_ERROR');
         // El importe de inscripción es una configuración del tenant y nunca se
         // acepta desde el navegador. Así, una petición manipulada no puede
