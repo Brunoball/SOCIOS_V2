@@ -2,12 +2,15 @@ import React, { useEffect, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowRotateLeft,
+  faArrowTrendDown,
+  faArrowTrendUp,
   faCashRegister,
   faGear,
   faLocationDot,
   faMoneyBillTransfer,
   faPen,
   faPlus,
+  faTags,
   faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../Global/components/ModulePage";
@@ -18,11 +21,96 @@ import { configuracionApi } from "./api/configuracionApi";
 import { useConfiguracion } from "./hooks/useConfiguracion";
 import "./Configuracion.css";
 
-const upper = (value) => value.toLocaleUpperCase("es-AR");
+const upper = (value) => String(value ?? "").toLocaleUpperCase("es-AR");
 const money = (value) => new Intl.NumberFormat("es-AR", {
   style: "currency",
   currency: "ARS",
 }).format(Number(value || 0));
+
+const LIST_META = {
+  medios_pago: {
+    label: "medio de pago",
+    title: "Medios de pago",
+    description: "Opciones disponibles al cobrar cuotas, inscripciones y movimientos contables.",
+    icon: faMoneyBillTransfer,
+    summaryKey: "medios_pago_activos",
+    empty: "Todavía no hay medios de pago configurados.",
+    subtitle: "El medio quedará disponible en Cuotas, Ingresos y Egresos.",
+    maxLength: 100,
+  },
+  localidades: {
+    label: "localidad",
+    title: "Localidades",
+    description: "Localidades disponibles para el domicilio de los socios.",
+    icon: faLocationDot,
+    summaryKey: "localidades_activos",
+    empty: "Todavía no hay localidades configuradas.",
+    subtitle: "La localidad quedará disponible en Socios.",
+    maxLength: 120,
+  },
+  contable_proveedores: {
+    label: "persona o proveedor",
+    title: "Personas y proveedores",
+    description: "Lista compartida por los formularios de otros ingresos y egresos.",
+    icon: faCashRegister,
+    summaryKey: "contable_proveedores_activos",
+    empty: "Todavía no hay personas o proveedores contables.",
+    subtitle: "La opción quedará disponible en Ingresos y Egresos.",
+    maxLength: 160,
+  },
+  contable_categorias_ingreso: {
+    label: "categoría de ingreso",
+    title: "Categorías de ingresos",
+    description: "Clasificación de los ingresos manuales ajenos a cuotas e inscripciones.",
+    icon: faArrowTrendUp,
+    summaryKey: "contable_categorias_ingreso_activos",
+    empty: "Todavía no hay categorías de ingresos.",
+    subtitle: "La categoría quedará disponible al registrar otros ingresos.",
+    maxLength: 160,
+  },
+  contable_conceptos_ingreso: {
+    label: "descripción de ingreso",
+    title: "Descripciones de ingresos",
+    description: "Conceptos o imputaciones reutilizables para identificar cada ingreso manual.",
+    icon: faTags,
+    summaryKey: "contable_conceptos_ingreso_activos",
+    empty: "Todavía no hay descripciones de ingresos.",
+    subtitle: "La descripción quedará disponible al registrar otros ingresos.",
+    maxLength: 160,
+  },
+  contable_categorias_egreso: {
+    label: "categoría de egreso",
+    title: "Categorías de egresos",
+    description: "Clasificación principal para ordenar y resumir los gastos.",
+    icon: faArrowTrendDown,
+    summaryKey: "contable_categorias_egreso_activos",
+    empty: "Todavía no hay categorías de egresos.",
+    subtitle: "La categoría quedará disponible al registrar egresos.",
+    maxLength: 160,
+  },
+  contable_conceptos_egreso: {
+    label: "descripción de egreso",
+    title: "Descripciones de egresos",
+    description: "Conceptos reutilizables para detallar la imputación de cada gasto.",
+    icon: faTags,
+    summaryKey: "contable_conceptos_egreso_activos",
+    empty: "Todavía no hay descripciones de egresos.",
+    subtitle: "La descripción quedará disponible al registrar egresos.",
+    maxLength: 160,
+  },
+};
+
+const CONFIG_LIST_ORDER = [
+  "medios_pago",
+  "localidades",
+  "contable_proveedores",
+  "contable_categorias_ingreso",
+  "contable_conceptos_ingreso",
+  "contable_categorias_egreso",
+  "contable_conceptos_egreso",
+];
+
+const itemId = (item) => item.id_medio_pago || item.id_localidad || item.id_opcion;
 
 const emptyListForm = (lista = "medios_pago") => ({
   lista,
@@ -50,20 +138,13 @@ function SettingsCard({ icon, title, description, badge, children, action }) {
   );
 }
 
-function ConfigList({
-  items,
-  listKey,
-  emptyText,
-  writable,
-  onEdit,
-  onState,
-}) {
+function ConfigList({ items, listKey, emptyText, writable, onEdit, onState }) {
   if (!items.length) return <div className="config-list__empty">{emptyText}</div>;
 
   return (
     <div className="config-list">
       {items.map((item) => {
-        const id = item.id_medio_pago || item.id_localidad;
+        const id = itemId(item);
         const usageCount = Number(item.cantidad_usos || 0);
         const stateAction = item.activo || usageCount === 0 ? "eliminar" : "reactivar";
         return (
@@ -74,8 +155,8 @@ function ConfigList({
                 {listKey === "localidades" && item.codigo_postal
                   ? `CP ${item.codigo_postal} · `
                   : ""}
-                {item.cantidad_usos
-                  ? `${item.cantidad_usos} uso${item.cantidad_usos === 1 ? "" : "s"}`
+                {usageCount
+                  ? `${usageCount} uso${usageCount === 1 ? "" : "s"}`
                   : "Sin uso"}
               </span>
             </div>
@@ -149,7 +230,7 @@ export default function Configuracion() {
   const openEditItem = (lista, item) => {
     setListForm({
       lista,
-      id: String(item.id_medio_pago || item.id_localidad),
+      id: String(itemId(item)),
       nombre: item.nombre || "",
       codigo_postal: item.codigo_postal || "",
     });
@@ -178,7 +259,7 @@ export default function Configuracion() {
   const confirmState = async (event) => {
     event.preventDefault();
     if (!stateModal) return;
-    const id = stateModal.item.id_medio_pago || stateModal.item.id_localidad;
+    const id = itemId(stateModal.item);
     setSaving(true);
     setFeedback(null);
     try {
@@ -196,13 +277,14 @@ export default function Configuracion() {
     }
   };
 
-  const listLabel = listForm.lista === "localidades" ? "localidad" : "medio de pago";
+  const currentMeta = LIST_META[listForm.lista] || LIST_META.medios_pago;
+  const locationsActive = resumen.localidades_activos ?? resumen.localidades_activas ?? 0;
 
   return (
     <>
       <ModulePage
         title="Configuración"
-        description="Administrá parámetros generales y listas reutilizables del sistema."
+        description="Administrá parámetros generales y todas las listas reutilizables del sistema."
         canCreate={false}
         onRefresh={cargar}
         refreshing={loading}
@@ -214,10 +296,11 @@ export default function Configuracion() {
           onClose={() => setFeedback(null)}
         />
 
-        <div className="config-overview">
+        <div className="config-overview config-overview--four">
           <div><FontAwesomeIcon icon={faGear} /><span>Parámetros centralizados</span><strong>1</strong></div>
           <div><FontAwesomeIcon icon={faMoneyBillTransfer} /><span>Medios de pago activos</span><strong>{resumen.medios_pago_activos || 0}</strong></div>
-          <div><FontAwesomeIcon icon={faLocationDot} /><span>Localidades activas</span><strong>{resumen.localidades_activas || 0}</strong></div>
+          <div><FontAwesomeIcon icon={faLocationDot} /><span>Localidades activas</span><strong>{locationsActive}</strong></div>
+          <div><FontAwesomeIcon icon={faCashRegister} /><span>Opciones contables activas</span><strong>{resumen.contable_listas_activas || 0}</strong></div>
         </div>
 
         <div className="config-grid">
@@ -255,56 +338,42 @@ export default function Configuracion() {
             <p className="config-help">El importe queda como valor inicial en el pago. Puede ajustarse manualmente para una excepción sin modificar la configuración general.</p>
           </SettingsCard>
 
-          <SettingsCard
-            icon={faMoneyBillTransfer}
-            title="Medios de pago"
-            description="Opciones disponibles al cobrar cuotas e inscripciones."
-            badge={`${resumen.medios_pago_activos || 0} ACTIVOS`}
-            action={writable ? (
-              <button className="config-addButton" type="button" onClick={() => openNewItem("medios_pago")}>
-                <FontAwesomeIcon icon={faPlus} /> Agregar
-              </button>
-            ) : null}
-          >
-            <ConfigList
-              items={listas.medios_pago || []}
-              listKey="medios_pago"
-              emptyText="Todavía no hay medios de pago configurados."
-              writable={writable}
-              onEdit={openEditItem}
-              onState={(lista, item, action) => setStateModal({ lista, item, action })}
-            />
-          </SettingsCard>
-
-          <SettingsCard
-            icon={faLocationDot}
-            title="Localidades"
-            description="Localidades disponibles para el domicilio de los socios."
-            badge={`${resumen.localidades_activas || 0} ACTIVAS`}
-            action={writable ? (
-              <button className="config-addButton" type="button" onClick={() => openNewItem("localidades")}>
-                <FontAwesomeIcon icon={faPlus} /> Agregar
-              </button>
-            ) : null}
-          >
-            <ConfigList
-              items={listas.localidades || []}
-              listKey="localidades"
-              emptyText="Todavía no hay localidades configuradas."
-              writable={writable}
-              onEdit={openEditItem}
-              onState={(lista, item, action) => setStateModal({ lista, item, action })}
-            />
-          </SettingsCard>
+          {CONFIG_LIST_ORDER.map((listKey) => {
+            const meta = LIST_META[listKey];
+            const activeCount = listKey === "localidades"
+              ? locationsActive
+              : Number(resumen[meta.summaryKey] || 0);
+            return (
+              <SettingsCard
+                key={listKey}
+                icon={meta.icon}
+                title={meta.title}
+                description={meta.description}
+                badge={`${activeCount} ${activeCount === 1 ? "ACTIVA" : "ACTIVAS"}`}
+                action={writable ? (
+                  <button className="config-addButton" type="button" onClick={() => openNewItem(listKey)}>
+                    <FontAwesomeIcon icon={faPlus} /> Agregar
+                  </button>
+                ) : null}
+              >
+                <ConfigList
+                  items={listas[listKey] || []}
+                  listKey={listKey}
+                  emptyText={meta.empty}
+                  writable={writable}
+                  onEdit={openEditItem}
+                  onState={(lista, item, action) => setStateModal({ lista, item, action })}
+                />
+              </SettingsCard>
+            );
+          })}
         </div>
       </ModulePage>
 
       <CrudModal
         open={listModalOpen}
-        title={`${listForm.id ? "Editar" : "Agregar"} ${listLabel}`}
-        subtitle={listForm.lista === "localidades"
-          ? "La localidad quedará disponible en Socios."
-          : "El medio quedará disponible en los pagos del módulo Cuotas."}
+        title={`${listForm.id ? "Editar" : "Agregar"} ${currentMeta.label}`}
+        subtitle={currentMeta.subtitle}
         onClose={() => setListModalOpen(false)}
         onSubmit={saveListItem}
         saving={saving}
@@ -317,7 +386,7 @@ export default function Configuracion() {
               <input
                 value={listForm.nombre}
                 onChange={(event) => setListForm((current) => ({ ...current, nombre: upper(event.target.value) }))}
-                maxLength={120}
+                maxLength={currentMeta.maxLength}
                 required
                 autoFocus
               />

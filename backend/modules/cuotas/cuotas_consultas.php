@@ -194,7 +194,7 @@ abstract class CuotasConsultas extends CuotasSoporte
                 $key = self::periodKey((int)$assignment['id_socio'], (int)$assignment['id_categoria'], $year, $month);
                 if (isset($registered[$key])) continue;
                 $base = self::priceForPeriod($prices[(int)$assignment['id_categoria']] ?? [], (float)$assignment['monto_actual'], $year, $month);
-                $amount = round($base * (1 - $discount / 100), 2);
+                $amount = self::amountWithFamilyDiscount($base, $discount);
                 $label = self::monthName($month) . ' ' . $year;
                 $itemsByPartnerCategory[$itemKey]['periodos_pendientes'][$key] = [
                     'anio' => $year,
@@ -273,6 +273,18 @@ abstract class CuotasConsultas extends CuotasSoporte
                     $row['modalidad_codigo']
                     ?? ($row['tipo_registro'] === 'INSCRIPCION' ? 'INSCRIPCION' : 'MENSUAL')
                 ));
+
+                // Una inscripción no pertenece a un mes de cuota. Por eso no
+                // debe aparecer en "Pagados/Condonados del mes". Solo se
+                // incluye cuando se elige expresamente el filtro INSCRIPCIÓN
+                // o cuando la consulta no está acotada a ningún mes.
+                if ($row['tipo_registro'] === 'INSCRIPCION') {
+                    if ($selectedModality === 'INSCRIPCION') {
+                        return true;
+                    }
+                    return $selectedModality === null && $selectedMonth === null;
+                }
+
                 if ($selectedModality !== null && $modalityCode !== $selectedModality) {
                     return false;
                 }
@@ -293,8 +305,11 @@ abstract class CuotasConsultas extends CuotasSoporte
         if ($selectedMonth !== null) {
             $operations = array_values(array_filter(
                 $operations,
-                static function (array $operation) use ($selectedMonth): bool {
-                    if ($operation['tipo'] === 'INSCRIPCION' || !$operation['es_paquete']) {
+                static function (array $operation) use ($selectedMonth, $selectedModality): bool {
+                    if ($operation['tipo'] === 'INSCRIPCION') {
+                        return $selectedModality === 'INSCRIPCION';
+                    }
+                    if (!$operation['es_paquete']) {
                         return true;
                     }
                     foreach ($operation['lineas'] as $line) {
@@ -445,7 +460,7 @@ abstract class CuotasConsultas extends CuotasSoporte
                 $key = self::periodKey((int)$assignment['id_socio'], (int)$assignment['id_categoria'], $year, $month);
                 $payment = $paymentMap[$key] ?? null;
                 $base = self::priceForPeriod($prices[(int)$assignment['id_categoria']] ?? [], (float)$assignment['monto_actual'], $year, $month);
-                $amount = round($base * (1 - $discount / 100), 2);
+                $amount = self::amountWithFamilyDiscount($base, $discount);
                 $periods[$key] = [
                     'clave' => $key,
                     'id_socio' => (int)$assignment['id_socio'],

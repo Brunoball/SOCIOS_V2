@@ -11,6 +11,7 @@ import {
   faTags,
   faUserCircle,
   faUsers,
+  faWallet,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 import { clearSession, getSession } from "../Global/auth/session";
@@ -26,6 +27,13 @@ const NAV_ITEMS = [
   },
   { key: "cuotas", label: "Cuotas", path: "/cuotas", icon: faReceipt },
   { key: "categorias", label: "Categorías", path: "/categorias", icon: faTags },
+  {
+    key: "contable", label: "Contable", path: "/contable", icon: faWallet,
+    children: [
+      { key: "contable-ingresos", label: "Ingresos", path: "/contable/ingresos" },
+      { key: "contable-egresos", label: "Egresos", path: "/contable/egresos" },
+    ],
+  },
 ];
 
 function LogoutModal({ open, onClose, onConfirm }) {

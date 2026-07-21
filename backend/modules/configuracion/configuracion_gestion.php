@@ -8,7 +8,7 @@ trait ConfiguracionGestion
         $db = $auth['db'];
         $amount = decimal_amount($body['monto_inscripcion'] ?? null, 'monto de inscripción', 0.01);
 
-        $result = transaction($db, static function () use ($db, $auth, $amount): array {
+        return transaction($db, static function () use ($db, $auth, $amount): array {
             $statement = $db->prepare(
                 "SELECT id_modalidad_pago, monto_fijo
                  FROM modalidades_pago
@@ -46,95 +46,63 @@ trait ConfiguracionGestion
             );
             return ['parametros' => $after];
         });
-
-        return $result;
     }
 
     private static function guardarItemDatos(array $auth, array $body): array
     {
         $db = $auth['db'];
-        $list = self::listaValida($body['lista'] ?? null);
+        $definition = configuracion_lista_definicion($body['lista'] ?? null);
         $idText = trim((string)($body['id'] ?? ''));
         $id = $idText === '' ? null : positive_id($idText, 'opción');
         $name = required_text(
             $body,
             'nombre',
-            $list === 'localidades' ? 'nombre de localidad' : 'nombre del medio de pago',
-            $list === 'localidades' ? 120 : 100
+            $definition['etiqueta'],
+            (int)$definition['max_nombre']
         );
-        $postalCode = $list === 'localidades'
+        $postalCode = $definition['lista'] === 'localidades'
             ? optional_text($body['codigo_postal'] ?? null, 20)
             : null;
 
-        if ($list === 'medios_pago' && self::esMedioInterno($name)) {
+        if ($definition['lista'] === 'medios_pago' && configuracion_es_medio_interno($name)) {
             api_error('CONDONACIÓN es un medio interno del sistema y no se puede administrar.', 'MEDIO_PAGO_RESERVADO');
         }
 
         try {
-            return transaction($db, static function () use ($db, $auth, $list, $id, $name, $postalCode): array {
-                $idField = $list === 'medios_pago' ? 'id_medio_pago' : 'id_localidad';
-                $table = $list;
+            return transaction($db, static function () use (
+                $db,
+                $auth,
+                $definition,
+                $id,
+                $name,
+                $postalCode
+            ): array {
                 $before = null;
-
                 if ($id !== null) {
-                    $before = self::itemConfiguracion($db, $list, $id, true);
+                    $before = configuracion_item($db, $definition, $id, true);
                     if (!$before) api_error('La opción que intentás editar no existe.', 'OPCION_NO_ENCONTRADA', 404);
-                    if ($list === 'medios_pago' && self::esMedioInterno((string)$before['nombre'])) {
+                    if ($definition['lista'] === 'medios_pago' && configuracion_es_medio_interno((string)$before['nombre'])) {
                         api_error('El medio interno CONDONACIÓN no se puede modificar.', 'MEDIO_PAGO_RESERVADO');
                     }
-
-                    $duplicate = $db->prepare("SELECT {$idField} FROM {$table} WHERE nombre = ? AND {$idField} <> ? LIMIT 1");
-                    $duplicate->execute([$name, $id]);
-                    if ($duplicate->fetchColumn()) {
-                        api_error('Ya existe otra opción con ese nombre.', 'NOMBRE_DUPLICADO', 409);
-                    }
-
-                    if ($list === 'medios_pago') {
-                        $db->prepare('UPDATE medios_pago SET nombre = ? WHERE id_medio_pago = ?')
-                            ->execute([$name, $id]);
-                    } else {
-                        $db->prepare('UPDATE localidades SET nombre = ?, codigo_postal = ? WHERE id_localidad = ?')
-                            ->execute([$name, $postalCode, $id]);
-                    }
+                    self::validarNombreDuplicado($db, $definition, $name, $id);
+                    self::actualizarItem($db, $definition, $id, $name, $postalCode);
                     $savedId = $id;
-                    $action = $list === 'medios_pago' ? 'MODIFICAR_MEDIO_PAGO' : 'MODIFICAR_LOCALIDAD';
-                    $description = $list === 'medios_pago'
-                        ? 'Se modificó un medio de pago.'
-                        : 'Se modificó una localidad.';
+                    $action = 'MODIFICAR_' . $definition['entidad'];
+                    $description = 'Se modificó una opción de configuración.';
                 } else {
-                    $duplicate = $db->prepare("SELECT {$idField}, activo FROM {$table} WHERE nombre = ? LIMIT 1");
-                    $duplicate->execute([$name]);
-                    $existing = $duplicate->fetch();
-                    if ($existing) {
-                        api_error(
-                            (bool)$existing['activo']
-                                ? 'Ya existe una opción activa con ese nombre.'
-                                : 'Esa opción ya existe inactiva. Podés reactivarla o eliminarla desde la lista.',
-                            'NOMBRE_DUPLICADO',
-                            409
-                        );
-                    }
-
-                    if ($list === 'medios_pago') {
-                        $db->prepare('INSERT INTO medios_pago (nombre, activo) VALUES (?, 1)')->execute([$name]);
-                    } else {
-                        $db->prepare('INSERT INTO localidades (nombre, codigo_postal, activo) VALUES (?, ?, 1)')
-                            ->execute([$name, $postalCode]);
-                    }
-                    $savedId = (int)$db->lastInsertId();
-                    $action = $list === 'medios_pago' ? 'CREAR_MEDIO_PAGO' : 'CREAR_LOCALIDAD';
-                    $description = $list === 'medios_pago'
-                        ? 'Se creó un medio de pago.'
-                        : 'Se creó una localidad.';
+                    self::validarNombreDuplicado($db, $definition, $name, null);
+                    $savedId = self::insertarItem($db, $definition, $name, $postalCode);
+                    $action = 'CREAR_' . $definition['entidad'];
+                    $description = 'Se creó una opción de configuración.';
                 }
 
-                $after = self::itemConfiguracion($db, $list, $savedId);
+                $after = configuracion_item($db, $definition, $savedId);
                 audit_change(
                     $db,
                     $auth,
                     'CONFIGURACION',
                     $action,
-                    $table,
+                    $definition['tabla'],
                     $savedId,
                     $description,
                     $before,
@@ -143,7 +111,7 @@ trait ConfiguracionGestion
 
                 return [
                     'creado' => $id === null,
-                    'lista' => $list,
+                    'lista' => $definition['lista'],
                     'item' => $after,
                 ];
             });
@@ -158,62 +126,43 @@ trait ConfiguracionGestion
     private static function cambiarEstadoItemDatos(array $auth, array $body, bool $active): array
     {
         $db = $auth['db'];
-        $list = self::listaValida($body['lista'] ?? null);
+        $definition = configuracion_lista_definicion($body['lista'] ?? null);
         $id = positive_id($body['id'] ?? null, 'opción');
 
-        return transaction($db, static function () use ($db, $auth, $list, $id, $active): array {
-            $before = self::itemConfiguracion($db, $list, $id, true);
+        return transaction($db, static function () use ($db, $auth, $definition, $id, $active): array {
+            $before = configuracion_item($db, $definition, $id, true);
             if (!$before) api_error('La opción seleccionada no existe.', 'OPCION_NO_ENCONTRADA', 404);
-            if ($list === 'medios_pago' && self::esMedioInterno((string)$before['nombre'])) {
+            if ($definition['lista'] === 'medios_pago' && configuracion_es_medio_interno((string)$before['nombre'])) {
                 api_error('El medio interno CONDONACIÓN no se puede eliminar ni reactivar.', 'MEDIO_PAGO_RESERVADO');
             }
 
-            $usageStatement = $list === 'medios_pago'
-                ? $db->prepare(
-                    'SELECT
-                        (SELECT COUNT(*) FROM pagos WHERE id_medio_pago = ?)
-                        +
-                        (SELECT COUNT(*) FROM pagos_inscripciones WHERE id_medio_pago = ?)'
-                )
-                : $db->prepare('SELECT COUNT(*) FROM socios WHERE id_localidad = ?');
-
-            $usageStatement->execute($list === 'medios_pago' ? [$id, $id] : [$id]);
-            $usageCount = (int)$usageStatement->fetchColumn();
-
+            $usageCount = configuracion_cantidad_usos($db, $definition, $id);
             if ($active) {
                 if ((bool)$before['activo']) {
                     api_error('La opción ya se encuentra activa.', 'ESTADO_SIN_CAMBIOS', 409);
                 }
-
-                if ($list === 'medios_pago') {
-                    $db->prepare('UPDATE medios_pago SET activo = 1 WHERE id_medio_pago = ?')->execute([$id]);
-                } else {
-                    $db->prepare('UPDATE localidades SET activo = 1 WHERE id_localidad = ?')->execute([$id]);
-                }
-
-                $after = self::itemConfiguracion($db, $list, $id);
-                $entity = $list === 'medios_pago' ? 'MEDIO_PAGO' : 'LOCALIDAD';
+                self::actualizarEstado($db, $definition, $id, true);
+                $after = configuracion_item($db, $definition, $id);
                 audit_change(
                     $db,
                     $auth,
                     'CONFIGURACION',
-                    'REACTIVAR_' . $entity,
-                    $list,
+                    'REACTIVAR_' . $definition['entidad'],
+                    $definition['tabla'],
                     $id,
                     'Se reactivó una opción de configuración.',
                     $before,
                     $after
                 );
-
                 return [
-                    'lista' => $list,
+                    'lista' => $definition['lista'],
                     'item' => $after,
                     'eliminado_definitivo' => false,
                     'desactivado' => false,
                 ];
             }
 
-            if ($list === 'medios_pago' && (bool)$before['activo']) {
+            if ($definition['lista'] === 'medios_pago' && (bool)$before['activo']) {
                 $statement = $db->prepare(
                     "SELECT COUNT(*)
                      FROM medios_pago
@@ -224,36 +173,28 @@ trait ConfiguracionGestion
                 $statement->execute([$id]);
                 if ((int)$statement->fetchColumn() === 0) {
                     api_error(
-                        'Debe quedar al menos un medio de pago activo para registrar cobros.',
+                        'Debe quedar al menos un medio de pago activo para registrar movimientos.',
                         'ULTIMO_MEDIO_PAGO_ACTIVO',
                         409
                     );
                 }
             }
 
-            $entity = $list === 'medios_pago' ? 'MEDIO_PAGO' : 'LOCALIDAD';
-
             if ($usageCount === 0) {
-                if ($list === 'medios_pago') {
-                    $db->prepare('DELETE FROM medios_pago WHERE id_medio_pago = ?')->execute([$id]);
-                } else {
-                    $db->prepare('DELETE FROM localidades WHERE id_localidad = ?')->execute([$id]);
-                }
-
+                self::eliminarItemFisico($db, $definition, $id);
                 audit_change(
                     $db,
                     $auth,
                     'CONFIGURACION',
-                    'ELIMINAR_' . $entity,
-                    $list,
+                    'ELIMINAR_' . $definition['entidad'],
+                    $definition['tabla'],
                     $id,
                     'Se eliminó definitivamente una opción de configuración sin uso.',
                     $before,
                     null
                 );
-
                 return [
-                    'lista' => $list,
+                    'lista' => $definition['lista'],
                     'item' => null,
                     'eliminado_definitivo' => true,
                     'desactivado' => false,
@@ -268,31 +209,107 @@ trait ConfiguracionGestion
                 );
             }
 
-            if ($list === 'medios_pago') {
-                $db->prepare('UPDATE medios_pago SET activo = 0 WHERE id_medio_pago = ?')->execute([$id]);
-            } else {
-                $db->prepare('UPDATE localidades SET activo = 0 WHERE id_localidad = ?')->execute([$id]);
-            }
-
-            $after = self::itemConfiguracion($db, $list, $id);
+            self::actualizarEstado($db, $definition, $id, false);
+            $after = configuracion_item($db, $definition, $id);
             audit_change(
                 $db,
                 $auth,
                 'CONFIGURACION',
-                'DESACTIVAR_' . $entity,
-                $list,
+                'DESACTIVAR_' . $definition['entidad'],
+                $definition['tabla'],
                 $id,
                 'Se desactivó una opción de configuración porque posee registros asociados.',
                 $before,
                 $after
             );
-
             return [
-                'lista' => $list,
+                'lista' => $definition['lista'],
                 'item' => $after,
                 'eliminado_definitivo' => false,
                 'desactivado' => true,
             ];
         });
+    }
+
+    private static function validarNombreDuplicado(PDO $db, array $definition, string $name, ?int $excludeId): void
+    {
+        if ($definition['tabla'] === 'contable_opciones') {
+            $sql = 'SELECT id_opcion, activo FROM contable_opciones WHERE tipo = ? AND nombre = ?';
+            $params = [$definition['tipo'], $name];
+            if ($excludeId !== null) {
+                $sql .= ' AND id_opcion <> ?';
+                $params[] = $excludeId;
+            }
+        } else {
+            $sql = "SELECT {$definition['id_campo']} AS id, activo FROM {$definition['tabla']} WHERE nombre = ?";
+            $params = [$name];
+            if ($excludeId !== null) {
+                $sql .= " AND {$definition['id_campo']} <> ?";
+                $params[] = $excludeId;
+            }
+        }
+        $sql .= ' LIMIT 1';
+        $statement = $db->prepare($sql);
+        $statement->execute($params);
+        $existing = $statement->fetch();
+        if ($existing) {
+            api_error(
+                (bool)$existing['activo']
+                    ? 'Ya existe una opción activa con ese nombre.'
+                    : 'Esa opción ya existe inactiva. Podés reactivarla desde la lista.',
+                'NOMBRE_DUPLICADO',
+                409
+            );
+        }
+    }
+
+    private static function actualizarItem(PDO $db, array $definition, int $id, string $name, ?string $postalCode): void
+    {
+        if ($definition['lista'] === 'medios_pago') {
+            $db->prepare('UPDATE medios_pago SET nombre = ? WHERE id_medio_pago = ?')->execute([$name, $id]);
+        } elseif ($definition['lista'] === 'localidades') {
+            $db->prepare('UPDATE localidades SET nombre = ?, codigo_postal = ? WHERE id_localidad = ?')
+                ->execute([$name, $postalCode, $id]);
+        } else {
+            $db->prepare('UPDATE contable_opciones SET nombre = ? WHERE id_opcion = ? AND tipo = ?')
+                ->execute([$name, $id, $definition['tipo']]);
+        }
+    }
+
+    private static function insertarItem(PDO $db, array $definition, string $name, ?string $postalCode): int
+    {
+        if ($definition['lista'] === 'medios_pago') {
+            $db->prepare('INSERT INTO medios_pago (nombre, activo) VALUES (?, 1)')->execute([$name]);
+        } elseif ($definition['lista'] === 'localidades') {
+            $db->prepare('INSERT INTO localidades (nombre, codigo_postal, activo) VALUES (?, ?, 1)')
+                ->execute([$name, $postalCode]);
+        } else {
+            $db->prepare('INSERT INTO contable_opciones (tipo, nombre, activo) VALUES (?, ?, 1)')
+                ->execute([$definition['tipo'], $name]);
+        }
+        return (int)$db->lastInsertId();
+    }
+
+    private static function actualizarEstado(PDO $db, array $definition, int $id, bool $active): void
+    {
+        $value = $active ? 1 : 0;
+        if ($definition['tabla'] === 'contable_opciones') {
+            $db->prepare('UPDATE contable_opciones SET activo = ? WHERE id_opcion = ? AND tipo = ?')
+                ->execute([$value, $id, $definition['tipo']]);
+        } else {
+            $db->prepare("UPDATE {$definition['tabla']} SET activo = ? WHERE {$definition['id_campo']} = ?")
+                ->execute([$value, $id]);
+        }
+    }
+
+    private static function eliminarItemFisico(PDO $db, array $definition, int $id): void
+    {
+        if ($definition['tabla'] === 'contable_opciones') {
+            $db->prepare('DELETE FROM contable_opciones WHERE id_opcion = ? AND tipo = ?')
+                ->execute([$id, $definition['tipo']]);
+        } else {
+            $db->prepare("DELETE FROM {$definition['tabla']} WHERE {$definition['id_campo']} = ?")
+                ->execute([$id]);
+        }
     }
 }

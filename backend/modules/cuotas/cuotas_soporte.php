@@ -302,6 +302,15 @@ abstract class CuotasSoporte
         return $percentage;
     }
 
+    protected static function amountWithFamilyDiscount(float $baseAmount, float $familyPercentage): float
+    {
+        // La misma regla se usa para cuotas mensuales, paquetes semestrales,
+        // contado anual e inscripciones. La modalidad nunca debe saltear el
+        // descuento familiar vigente del socio.
+        $percentage = max(0.0, min(100.0, $familyPercentage));
+        return round($baseAmount * (1 - $percentage / 100), 2);
+    }
+
     protected static function familyCounts(PDO $db): array
     {
         $rows = $db->query(

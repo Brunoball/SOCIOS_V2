@@ -230,7 +230,7 @@ abstract class CuotasRegistros extends CuotasConsultas
                     $partnerSnapshot = self::partnerSnapshot($db, $partnerId);
                     $categoryName = (string)$category['nombre'];
                     $base = self::priceForPeriod($prices[$categoryId] ?? [], (float)$category['monto_actual'], $year, $month);
-                    $discounted = round($base * (1 - $discountContext['porcentaje'] / 100), 2);
+                    $discounted = self::amountWithFamilyDiscount($base, (float)$discountContext['porcentaje']);
                     $amount = $state === 'CONDONADO' ? 0.0 : $discounted;
 
                     if ($existing) {
@@ -383,7 +383,7 @@ abstract class CuotasRegistros extends CuotasConsultas
 
                 $discountContext = self::discountContextForPartner($db, $partnerId, $rules, $discountCache);
                 $partnerSnapshot = self::partnerSnapshot($db, $partnerId);
-                $discounted = round($base * (1 - $discountContext['porcentaje'] / 100), 2);
+                $discounted = self::amountWithFamilyDiscount($base, (float)$discountContext['porcentaje']);
                 $amount = $state === 'CONDONADO' ? 0.0 : $discounted;
                 $reusable = $existingRows[0] ?? null;
                 if ($reusable) {
