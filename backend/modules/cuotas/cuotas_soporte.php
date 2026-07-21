@@ -7,6 +7,16 @@ abstract class CuotasSoporte
     protected const MODALIDADES_CUOTAS = ['MENSUAL', 'PRIMERA_MITAD', 'SEGUNDA_MITAD', 'CONTADO_ANUAL'];
     protected const MODALIDADES_PAQUETE = ['PRIMERA_MITAD', 'SEGUNDA_MITAD', 'CONTADO_ANUAL'];
 
+    /**
+     * Permite cobrar cuotas e inscripciones del año actual y del siguiente.
+     * La regla queda centralizada para que modal, filtros y validaciones usen
+     * exactamente el mismo límite.
+     */
+    protected static function maximumEnabledYear(): int
+    {
+        return (int)date('Y') + 1;
+    }
+
     protected static function allowedRecipients(PDO $db, int $principalId, bool $applyFamily): array
     {
         $statement = $db->prepare('SELECT id_socio, activo FROM socios WHERE id_socio = ?');

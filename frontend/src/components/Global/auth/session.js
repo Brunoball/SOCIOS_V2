@@ -57,3 +57,31 @@ export function clearSession() {
   }
   removeLegacyPersistentSession();
 }
+
+export function openAuthenticatedTab(path) {
+  const targetUrl = new URL(path, window.location.origin).toString();
+  const newTab = window.open("about:blank", "_blank");
+
+  if (!newTab) return false;
+
+  try {
+    const session = getSession();
+    if (session?.token) {
+      newTab.sessionStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify(session),
+      );
+    }
+
+    // La nueva pestaña ya tiene su propia copia de la sesión; se corta el
+    // acceso a la pestaña original antes de cargar el panel.
+    newTab.opener = null;
+    newTab.location.replace(targetUrl);
+  } catch {
+    // Si el navegador restringe alguna operación sobre about:blank, la
+    // navegación igualmente continúa y el panel validará la sesión.
+    newTab.location.href = targetUrl;
+  }
+
+  return true;
+}

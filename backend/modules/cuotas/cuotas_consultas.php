@@ -18,7 +18,7 @@ abstract class CuotasConsultas extends CuotasSoporte
 
         $yearText = trim((string)($filters['anio'] ?? ''));
         $year = $yearText === '' ? null : filter_var($yearText, FILTER_VALIDATE_INT, [
-            'options' => ['min_range' => 2000, 'max_range' => (int)date('Y')],
+            'options' => ['min_range' => 2000, 'max_range' => self::maximumEnabledYear()],
         ]);
         if ($year === false) api_error('El año seleccionado no es válido.', 'FILTRO_INVALIDO');
         $year = $year === null ? null : (int)$year;
@@ -429,7 +429,7 @@ abstract class CuotasConsultas extends CuotasSoporte
         $memberCount = count($members);
         $discount = $family ? self::discountForCount($rules, $memberCount) : 0.0;
         $currentYear = (int)date('Y');
-        $maximumEnabledYear = $currentYear;
+        $maximumEnabledYear = self::maximumEnabledYear();
         $endOfEnabledYear = new DateTimeImmutable($maximumEnabledYear . '-12-01');
         $periods = [];
         $earliestYear = $currentYear;
@@ -531,6 +531,7 @@ abstract class CuotasConsultas extends CuotasSoporte
     protected static function aniosCatalogo(PDO $db): array
     {
         $currentYear = (int)date('Y');
+        $maximumEnabledYear = self::maximumEnabledYear();
         $earliest = $db->query(
             "SELECT MIN(anio) FROM (
                 SELECT YEAR(GREATEST(sc.fecha_desde, spa.vigente_desde, cpa.vigente_desde)) AS anio
@@ -545,7 +546,7 @@ abstract class CuotasConsultas extends CuotasSoporte
         )->fetchColumn();
         $firstYear = max(2000, min($currentYear, (int)($earliest ?: $currentYear)));
         $years = [];
-        for ($year = $currentYear; $year >= $firstYear; $year--) $years[] = $year;
+        for ($year = $maximumEnabledYear; $year >= $firstYear; $year--) $years[] = $year;
         return $years;
     }
 

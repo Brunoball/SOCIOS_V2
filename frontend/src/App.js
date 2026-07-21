@@ -16,10 +16,16 @@ import CuotasCobros from "./components/Configuracion/CuotasCobros/CuotasCobros";
 import SociosConfiguracion from "./components/Configuracion/Socios/SociosConfiguracion";
 import ContableConfiguracion from "./components/Configuracion/Contable/ContableConfiguracion";
 import Usuarios from "./components/Configuracion/Usuarios/Usuarios";
+import BotPanel from "./components/BotPanel/BotPanel";
+import { BOT_PANEL_ROUTE } from "./config/config";
 import { isAuthenticated } from "./components/Global/auth/session";
 
 function ProtectedLayout() {
   return isAuthenticated() ? <AppLayout /> : <Navigate to="/" replace />;
+}
+
+function ProtectedPage({ children }) {
+  return isAuthenticated() ? children : <Navigate to="/" replace />;
 }
 
 export default function App() {
@@ -27,6 +33,14 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={isAuthenticated() ? <Navigate to="/panel" replace /> : <Inicio />} />
+        <Route
+          path={BOT_PANEL_ROUTE}
+          element={
+            <ProtectedPage>
+              <BotPanel />
+            </ProtectedPage>
+          }
+        />
         <Route element={<ProtectedLayout />}>
           <Route path="/panel" element={<Dashboard />} />
 

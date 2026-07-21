@@ -8,14 +8,16 @@ import {
   faGear,
   faReceipt,
   faRightFromBracket,
+  faRobot,
   faTags,
   faUserCircle,
   faUsers,
   faWallet,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
-import { clearSession, getSession } from "../Global/auth/session";
+import { clearSession, getSession, openAuthenticatedTab } from "../Global/auth/session";
 import { apiPost } from "../Global/api/apiClient";
+import { BOT_PANEL_ROUTE } from "../../config/config";
 import "./AppLayout.css";
 
 const APP_NAME = "Gestión de Socios";
@@ -56,6 +58,13 @@ const NAV_ITEMS = [
       { key: "contable-egresos", label: "Egresos", path: "/contable/egresos" },
       { key: "contable-resumen", label: "Resumen", path: "/contable/resumen" },
     ],
+  },
+  {
+    key: "panel-bot",
+    label: "Panel Bot",
+    path: BOT_PANEL_ROUTE,
+    icon: faRobot,
+    external: true,
   },
 ];
 
@@ -170,7 +179,19 @@ export default function AppLayout() {
             const groupOpen = Boolean(item.children && active);
             return (
               <div className={`pp-navGroup ${item.children ? "has-sub" : ""} ${groupOpen ? "is-open" : ""}`} key={item.key}>
-                {item.children ? (
+                {item.external ? (
+                  <button
+                    className="pp-nav__item"
+                    type="button"
+                    title="Abrir en una pestaña nueva"
+                    onClick={() => {
+                      setDrawerOpen(false);
+                      openAuthenticatedTab(item.path);
+                    }}
+                  >
+                    <span className="pp-nav__icon"><FontAwesomeIcon icon={item.icon} /></span><span className="pp-nav__label">{item.label}</span>
+                  </button>
+                ) : item.children ? (
                   <NavLink className={`pp-nav__item ${active ? "is-active" : ""}`} to={item.defaultPath || item.path}>
                     <span className="pp-nav__icon"><FontAwesomeIcon icon={item.icon} /></span><span className="pp-nav__label">{item.label}</span>
                   </NavLink>
