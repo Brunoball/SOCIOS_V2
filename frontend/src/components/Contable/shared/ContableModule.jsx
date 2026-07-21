@@ -5,7 +5,6 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useLocation } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowTrendDown,
@@ -19,16 +18,16 @@ import {
   faPlus,
   faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
-import { ModulePage } from "../Global/components/ModulePage";
-import CrudModal from "../Global/components/CrudModal";
-import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
-import ModuleFeedback from "../Global/components/ModuleFeedback";
+import { ModulePage } from "../../Global/components/ModulePage";
+import CrudModal from "../../Global/components/CrudModal";
+import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
+import ModuleFeedback from "../../Global/components/ModuleFeedback";
 import {
   EntityFormPanel,
   EntityTabs,
   FloatingField,
-} from "../Global/components/TabbedForm";
-import { canWrite } from "../Global/auth/session";
+} from "../../Global/components/TabbedForm";
+import { canWrite } from "../../Global/auth/session";
 import { contableApi } from "./api/contableApi";
 import "./Contable.css";
 
@@ -333,14 +332,8 @@ function Breakdown({ title, items = [] }) {
   );
 }
 
-export default function Contable() {
-  const location = useLocation();
+export default function ContableModule({ view = "summary" }) {
   const writable = canWrite();
-  const view = location.pathname.endsWith("/ingresos")
-    ? "income"
-    : location.pathname.endsWith("/egresos")
-      ? "expense"
-      : "summary";
 
   const [catalogs, setCatalogs] = useState(emptyCatalogs);
   const [year, setYear] = useState(String(CURRENT_YEAR));

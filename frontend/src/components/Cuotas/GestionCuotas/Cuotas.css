@@ -63,8 +63,7 @@
 }
 
 @media (max-width: 1499px) {
-  .module-card__actions .mov-btn.cuotas-header-output-action,
-  .module-card__actions .mov-btn.cuotas-header-primary-action {
+  .module-card__actions .mov-btn.cuotas-header-output-action {
     display: none !important;
     flex: none;
   }

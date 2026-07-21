@@ -93,6 +93,16 @@ export default function AppLayout() {
   useEffect(() => setDrawerOpen(false), [location.pathname]);
 
   const activeLabel = useMemo(() => {
+    const configurationLabels = {
+      "/configuracion": "Configuración",
+      "/configuracion/cuotas": "Cuotas y cobros",
+      "/configuracion/socios": "Configuración de socios",
+      "/configuracion/contable": "Configuración contable",
+      "/configuracion/usuarios": "Configuración de usuarios",
+    };
+    if (configurationLabels[location.pathname]) {
+      return configurationLabels[location.pathname];
+    }
     if (location.pathname.startsWith("/configuracion")) return "Configuración";
     for (const item of NAV_ITEMS) {
       const child = item.children?.find((entry) => location.pathname === entry.path);

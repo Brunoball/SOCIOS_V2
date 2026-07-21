@@ -9,16 +9,16 @@ import {
   faUser,
   faWallet,
 } from "@fortawesome/free-solid-svg-icons";
-import { ModulePage } from "../Global/components/ModulePage";
-import CrudModal from "../Global/components/CrudModal";
-import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
-import ModuleFeedback from "../Global/components/ModuleFeedback";
+import { ModulePage } from "../../Global/components/ModulePage";
+import CrudModal from "../../Global/components/CrudModal";
+import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
+import ModuleFeedback from "../../Global/components/ModuleFeedback";
 import {
   EntityFormPanel,
   EntityTabs,
   FloatingField,
-} from "../Global/components/TabbedForm";
-import { canWrite } from "../Global/auth/session";
+} from "../../Global/components/TabbedForm";
+import { canWrite } from "../../Global/auth/session";
 import { cuotasApi } from "./api/cuotasApi";
 import { useCuotas } from "./hooks/useCuotas";
 import "./Cuotas.css";
@@ -557,7 +557,6 @@ export default function Cuotas() {
           aplicar_familia: paymentForm.aplicar_familia,
           id_categoria: paymentForm.id_categoria,
           anio: paymentForm.anio,
-          monto_base: paymentForm.monto_inscripcion,
           descripcion: paymentForm.descripcion_inscripcion,
           id_medio_pago: paymentForm.id_medio_pago,
           fecha_pago: paymentForm.fecha_pago,
@@ -831,10 +830,7 @@ export default function Cuotas() {
         tabsInTitle
         headFiltersClassName="cuotas-head-filters"
         secondaryActions={secondaryActions}
-        primaryActionLabel="Registrar pago"
-        primaryActionClassName="cuotas-header-primary-action"
-        onPrimaryAction={() => setPickerOpen(true)}
-        canCreate={writable}
+        canCreate={false}
         notice={
           !writable
             ? "Tu usuario tiene permiso de consulta. Los pagos y anulaciones están deshabilitados."
@@ -1438,19 +1434,16 @@ export default function Cuotas() {
                   <div className="cuotas-registration-box">
                     <div className="entity-form__grid">
                       <FloatingField
-                        label="Monto base por integrante *"
+                        label="Monto configurado por integrante"
                         active={Boolean(paymentForm.monto_inscripcion)}
                       >
                         <input
                           type="number"
                           placeholder=" "
-                          min="0.01"
-                          step="0.01"
                           value={paymentForm.monto_inscripcion}
-                          onChange={(event) =>
-                            updateForm("monto_inscripcion", event.target.value)
-                          }
-                          required
+                          readOnly
+                          aria-readonly="true"
+                          title="Este importe se administra desde Configuración"
                         />
                       </FloatingField>
                       <FloatingField

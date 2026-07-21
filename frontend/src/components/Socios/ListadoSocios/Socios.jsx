@@ -16,22 +16,22 @@ import {
   faUserSlash,
   faWallet,
 } from "@fortawesome/free-solid-svg-icons";
-import { ModulePage } from "../Global/components/ModulePage";
-import CrudModal from "../Global/components/CrudModal";
+import { ModulePage } from "../../Global/components/ModulePage";
+import CrudModal from "../../Global/components/CrudModal";
 import InfoModal, {
   InfoEmpty,
   InfoRow,
   InfoSection,
   InfoSummary,
-} from "../Global/components/InfoModal";
-import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
-import ModuleFeedback from "../Global/components/ModuleFeedback";
+} from "../../Global/components/InfoModal";
+import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
+import ModuleFeedback from "../../Global/components/ModuleFeedback";
 import {
   EntityFormPanel,
   EntityTabs,
   FloatingField,
-} from "../Global/components/TabbedForm";
-import { canWrite } from "../Global/auth/session";
+} from "../../Global/components/TabbedForm";
+import { canWrite } from "../../Global/auth/session";
 import { sociosApi } from "./api/sociosApi";
 import { useSocios } from "./hooks/useSocios";
 import "./Socios.css";

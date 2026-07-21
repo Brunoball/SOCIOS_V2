@@ -319,7 +319,17 @@ abstract class CuotasRegistros extends CuotasConsultas
         $categoryId = positive_id($body['id_categoria'] ?? null, 'categoría');
         $year = filter_var($body['anio'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 2000, 'max_range' => (int)date('Y')]]);
         if ($year === false) api_error('El año de inscripción no es válido.', 'VALIDATION_ERROR');
-        $baseAmount = decimal_amount($body['monto_base'] ?? null, 'monto de inscripción', 0.01);
+        // El importe de inscripción es una configuración del tenant y nunca se
+        // acepta desde el navegador. Así, una petición manipulada no puede
+        // registrar un monto diferente al definido en Configuración.
+        $baseAmount = self::registrationAmount($db);
+        if ((float)$baseAmount <= 0) {
+            api_error(
+                'Configurá un monto de inscripción válido antes de registrar el pago.',
+                'MONTO_INSCRIPCION_NO_CONFIGURADO',
+                409
+            );
+        }
         $applyFamily = filter_var($body['aplicar_familia'] ?? false, FILTER_VALIDATE_BOOL);
         $condoned = filter_var($body['condonado'] ?? false, FILTER_VALIDATE_BOOL);
         $date = valid_date($body['fecha_pago'] ?? date('Y-m-d'), 'pago');

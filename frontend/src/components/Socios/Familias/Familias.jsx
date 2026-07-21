@@ -18,8 +18,8 @@ import {
   FloatingField,
 } from "../../Global/components/TabbedForm";
 import { canWrite } from "../../Global/auth/session";
-import { familiasApi } from "../api/familiasApi";
-import { useFamilias } from "../hooks/useFamilias";
+import { familiasApi } from "./api/familiasApi";
+import { useFamilias } from "./hooks/useFamilias";
 import "./Familias.css";
 import "./FamiliasModal.css";
 

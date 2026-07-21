@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "../../Global/api/apiClient";
+import { apiGet, apiPost } from "../../../Global/api/apiClient";
 export const familiasApi = {
   listar: (params) => apiGet("familias_listar", params),
   obtener: (id) => apiGet("familias_obtener", { id }),

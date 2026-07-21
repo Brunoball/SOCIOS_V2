@@ -18,6 +18,7 @@ require_once __DIR__ . '/../modules/socios/routes.php';
 require_once __DIR__ . '/../modules/cuotas/routes.php';
 require_once __DIR__ . '/../modules/categorias/routes.php';
 require_once __DIR__ . '/../modules/configuracion/routes.php';
+require_once __DIR__ . '/../modules/usuarios/routes.php';
 require_once __DIR__ . '/../modules/contable/routes.php';
 
 date_default_timezone_set((string)env_value('APP_TIMEZONE', 'America/Argentina/Cordoba'));
@@ -39,6 +40,7 @@ register_socios_routes($router);
 register_cuotas_routes($router);
 register_categorias_routes($router);
 register_configuracion_routes($router);
+register_usuarios_routes($router);
 register_contable_routes($router);
 
 try {

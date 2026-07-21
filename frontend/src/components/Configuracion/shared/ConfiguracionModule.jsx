@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowLeft,
@@ -13,12 +14,13 @@ import {
   faPen,
   faTags,
   faTrashCan,
+  faUsers,
 } from "@fortawesome/free-solid-svg-icons";
-import { ModulePage } from "../Global/components/ModulePage";
-import CrudModal from "../Global/components/CrudModal";
-import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
-import ModuleFeedback from "../Global/components/ModuleFeedback";
-import { canWrite } from "../Global/auth/session";
+import { ModulePage } from "../../Global/components/ModulePage";
+import CrudModal from "../../Global/components/CrudModal";
+import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
+import ModuleFeedback from "../../Global/components/ModuleFeedback";
+import { canWrite } from "../../Global/auth/session";
 import { configuracionApi } from "./api/configuracionApi";
 import { useConfiguracion } from "./hooks/useConfiguracion";
 import "./Configuracion.css";
@@ -133,6 +135,14 @@ const LIST_META = {
 };
 
 const CONFIG_GROUPS = {
+  usuarios: {
+    title: "Usuarios",
+    description: "Administrá accesos, roles, contraseñas y el estado de cada usuario de la organización.",
+    icon: faUsers,
+    area: "Seguridad",
+    detail: "Altas, bajas, roles y contraseñas",
+    sections: [],
+  },
   cuotas: {
     title: "Cuotas y cobros",
     description: "Configurá el importe de inscripción y los medios disponibles para registrar cobros.",
@@ -264,17 +274,27 @@ function ConfigList({ items, listKey, emptyText, writable, onEdit, onState }) {
   );
 }
 
-export default function Configuracion() {
+export default function ConfiguracionModule({ group = null }) {
+  const navigate = useNavigate();
   const writable = canWrite();
   const { parametros, listas, resumen, error, cargar } = useConfiguracion();
-  const [activeGroup, setActiveGroup] = useState(null);
-  const [activeSection, setActiveSection] = useState(null);
+  const activeGroup = group;
+  const [activeSection, setActiveSection] = useState(
+    group ? CONFIG_GROUPS[group]?.sections[0]?.value || null : null,
+  );
   const [amount, setAmount] = useState("");
   const [listForm, setListForm] = useState(emptyListForm());
   const [listModalOpen, setListModalOpen] = useState(false);
   const [stateModal, setStateModal] = useState(null);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+
+  useEffect(() => {
+    setActiveSection(
+      group ? CONFIG_GROUPS[group]?.sections[0]?.value || null : null,
+    );
+    setFeedback(null);
+  }, [group]);
 
   useEffect(() => {
     const configured = Number(parametros.monto_inscripcion || 0);
@@ -287,7 +307,7 @@ export default function Configuracion() {
     const paymentCount = Number(resumen.medios_pago_activos || 0);
     const accountingCount = Number(resumen.contable_listas_activas || 0);
 
-    return [
+    const cards = [
       {
         id: "cuotas",
         ...CONFIG_GROUPS.cuotas,
@@ -304,7 +324,17 @@ export default function Configuracion() {
         status: `${accountingCount} ${accountingCount === 1 ? "opción" : "opciones"}`,
       },
     ];
-  }, [locationsActive, resumen]);
+
+    if (writable) {
+      cards.push({
+        id: "usuarios",
+        ...CONFIG_GROUPS.usuarios,
+        status: "Administración",
+      });
+    }
+
+    return cards;
+  }, [locationsActive, resumen, writable]);
 
   const saveAmount = async (event) => {
     event.preventDefault();
@@ -417,7 +447,7 @@ export default function Configuracion() {
           <div>
             <small>PANEL DE CONFIGURACIÓN</small>
             <strong>Todo organizado en accesos independientes</strong>
-            <p>Ingresá a una de las tres áreas y elegí la opción que necesitás desde sus pestañas.</p>
+            <p>Ingresá a una de las áreas y elegí la opción que necesitás desde sus pestañas.</p>
           </div>
         </div>
 
@@ -426,11 +456,7 @@ export default function Configuracion() {
             <ConfigAccessCard
               key={card.id}
               {...card}
-              onClick={() => {
-                setFeedback(null);
-                setActiveGroup(card.id);
-                setActiveSection(CONFIG_GROUPS[card.id].sections[0].value);
-              }}
+              onClick={() => navigate(`/configuracion/${card.id}`)}
             />
           ))}
         </div>
@@ -438,11 +464,7 @@ export default function Configuracion() {
     );
   }
 
-  const goBack = () => {
-    setFeedback(null);
-    setActiveGroup(null);
-    setActiveSection(null);
-  };
+  const goBack = () => navigate("/configuracion");
 
   return (
     <>
@@ -471,7 +493,7 @@ export default function Configuracion() {
               <div>
                 <small>CUOTAS</small>
                 <h2>Importe predeterminado</h2>
-                <p>Este valor funciona como punto de partida y puede modificarse manualmente en casos excepcionales.</p>
+                <p>Este es el valor oficial que el backend utilizará al registrar cada inscripción.</p>
               </div>
             </div>
             <form className="config-amountForm" onSubmit={saveAmount}>

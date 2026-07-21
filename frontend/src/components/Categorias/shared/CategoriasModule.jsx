@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faCalendarDays,
@@ -13,22 +12,22 @@ import {
   faUsers,
   faWallet,
 } from "@fortawesome/free-solid-svg-icons";
-import { ModulePage } from "../Global/components/ModulePage";
-import CrudModal from "../Global/components/CrudModal";
+import { ModulePage } from "../../Global/components/ModulePage";
+import CrudModal from "../../Global/components/CrudModal";
 import InfoModal, {
   InfoEmpty,
   InfoRow,
   InfoSection,
   InfoSummary,
-} from "../Global/components/InfoModal";
-import ModalEliminarGlobal from "../Global/components/ModalEliminarGlobal";
-import ModuleFeedback from "../Global/components/ModuleFeedback";
+} from "../../Global/components/InfoModal";
+import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
+import ModuleFeedback from "../../Global/components/ModuleFeedback";
 import {
   EntityFormPanel,
   EntityTabs,
   FloatingField,
-} from "../Global/components/TabbedForm";
-import { canWrite } from "../Global/auth/session";
+} from "../../Global/components/TabbedForm";
+import { canWrite } from "../../Global/auth/session";
 import { categoriasApi } from "./api/categoriasApi";
 import { useCategorias } from "./hooks/useCategorias";
 import { useDescuentosFamiliares } from "./hooks/useDescuentosFamiliares";
@@ -240,15 +239,10 @@ function DiscountForm({ form, setForm }) {
   );
 }
 
-export default function Categorias() {
-  const location = useLocation();
-  const navigate = useNavigate();
+export default function CategoriasModule({ section = "categorias" }) {
   const writable = canWrite();
-  const section = location.pathname.endsWith("/descuentos")
-    ? "descuentos"
-    : "categorias";
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState("activo");
   const filters = useMemo(
     () => ({ buscar: search, estado: status }),
     [search, status],
@@ -408,56 +402,45 @@ export default function Categorias() {
     section === "categorias" ? openNewCategory : openNewDiscount;
   const primaryLabel =
     section === "categorias" ? "Nueva categoría" : "Nuevo descuento";
-  const pageFilters = [
-    {
-      key: "seccion",
-      label: "Sección",
-      type: "tabs",
-      ariaLabel: "Configuración de categorías",
-      value: section,
-      onChange: (value) => {
-        const targetPath =
-          value === "descuentos" ? "/categorias/descuentos" : "/categorias";
-        if (location.pathname !== targetPath) navigate(targetPath);
-        setFeedback(null);
-      },
-      options: [
-        { value: "categorias", label: "Categorías" },
-        { value: "descuentos", label: "Descuentos familiares" },
-      ],
-    },
-    ...(section === "categorias"
-      ? [
-          {
-            key: "buscar",
-            label: "Búsqueda",
-            type: "search",
-            placeholder: " ",
-            value: search,
-            onChange: setSearch,
+  const pageFilters = section === "categorias"
+    ? [
+        {
+          key: "estado",
+          label: "Estado",
+          type: "tabs",
+          ariaLabel: "Estado de las categorías",
+          value: status,
+          onChange: (value) => {
+            setStatus(value);
+            setFeedback(null);
           },
-          {
-            key: "estado",
-            label: "Estado",
-            type: "select",
-            placeholder: "Todas",
-            value: status,
-            onChange: setStatus,
-            options: [
-              { value: "activo", label: "Activas" },
-              { value: "inactivo", label: "Dadas de baja" },
-            ],
-          },
-        ]
-      : []),
-  ];
+          options: [
+            { value: "activo", label: "Activas" },
+            { value: "inactivo", label: "Dadas de baja" },
+          ],
+        },
+        {
+          key: "buscar",
+          label: "Búsqueda",
+          type: "search",
+          placeholder: " ",
+          value: search,
+          onChange: setSearch,
+        },
+      ]
+    : [];
 
   return (
     <>
       <ModulePage
-        title="Categorías"
+        title={section === "categorias" ? "Categorías" : "Descuentos familiares"}
+        description={
+          section === "descuentos"
+            ? "Configurá los descuentos automáticos según la cantidad de integrantes activos de cada familia."
+            : undefined
+        }
         filters={pageFilters}
-        tabsInTitle
+        tabsInTitle={section === "categorias"}
         primaryActionLabel={primaryLabel}
         onPrimaryAction={primaryAction}
         canCreate={writable}
@@ -474,13 +457,6 @@ export default function Categorias() {
           onClose={() => setFeedback(null)}
         />
 
-        {section === "descuentos" ? (
-          <div className="module-notice categorias-discountNotice">
-            Las reglas son globales y se aplican por cantidad de integrantes
-            activos. Se usa el mayor umbral alcanzado: si configurás 2 = 10% y 3
-            = 15%, una familia de 4 recibe 15%.
-          </div>
-        ) : null}
 
         {section === "categorias" ? (
           <div

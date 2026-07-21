@@ -13,8 +13,12 @@ function request_auth_credentials(): array
     }
     $headerToken = trim((string)($_SERVER['HTTP_X_SESSION'] ?? $_SERVER['HTTP_X_SESSION_KEY'] ?? ''));
     if ($headerToken !== '') return ['token' => $headerToken, 'source' => 'header'];
-    $cookieName = (string)env_value('SESSION_COOKIE_NAME', 'socios_session');
-    return ['token' => trim((string)($_COOKIE[$cookieName] ?? '')), 'source' => 'cookie'];
+
+    // La autenticación de la SPA es deliberadamente explícita: el token vive
+    // únicamente en sessionStorage y debe enviarse como Bearer/header. No se
+    // reutilizan cookies persistentes de versiones anteriores al abrir otra
+    // pestaña, evitando que el navegador recupere una sesión automáticamente.
+    return ['token' => '', 'source' => 'none'];
 }
 
 function require_auth(): array

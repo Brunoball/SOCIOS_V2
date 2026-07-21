@@ -93,7 +93,10 @@ function auth_login(): never
         'agente' => client_user_agent(),
     ]);
 
-    auth_cookie($token, $expiresAt->getTimestamp());
+    // El acceso se mantiene con el token Bearer guardado por pestaña en el
+    // frontend. Además se elimina cualquier cookie heredada para que cerrar la
+    // pestaña obligue a pasar nuevamente por el formulario de inicio de sesión.
+    auth_cookie('', time() - 3600);
     auth_login_audit($master, $user, $usuario, true);
 
     api_success([
