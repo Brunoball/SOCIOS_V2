@@ -3,6 +3,13 @@ declare(strict_types=1);
 
 trait SociosGestion
 {
+    /**
+     * Implementado por SociosConsultas al componerse ambos traits en Socios.
+     * La declaración explícita evita que los analizadores estáticos interpreten
+     * las llamadas a self::detalle() como un método inexistente.
+     */
+    abstract private static function detalle(PDO $db, int $id): ?array;
+
     private static function guardarDatos(array $auth, array $body): array
     {
         $db = $auth['db'];
@@ -260,12 +267,50 @@ trait SociosGestion
         foreach ($currentStatement->fetchAll() as $row) $current[(int)$row['id_categoria']] = $row;
         $selected = array_fill_keys($categoryIds, true);
         $today = date('Y-m-d');
+        $currentMonthStart = date('Y-m-01');
+        $previousMonthEnd = (new DateTimeImmutable($currentMonthStart))
+            ->modify('-1 day')
+            ->format('Y-m-d');
+        $currentMonthEnd = (new DateTimeImmutable($currentMonthStart))
+            ->modify('last day of this month')
+            ->format('Y-m-d');
+        $paymentHistory = $db->prepare(
+            'SELECT 1 FROM pagos WHERE id_socio = ? AND id_categoria = ? LIMIT 1'
+        );
+        $registrationHistory = $db->prepare(
+            'SELECT 1 FROM pagos_inscripciones WHERE id_socio = ? AND id_categoria = ? LIMIT 1'
+        );
 
         foreach ($current as $categoryId => $row) {
             if (!isset($selected[$categoryId])) {
-                $until = max((string)$row['fecha_desde'], $today);
-                $db->prepare('UPDATE socio_categorias SET activo = 0, fecha_hasta = ?, id_categoria_activa = NULL WHERE id_socio_categoria = ?')
-                    ->execute([$until, $row['id_socio_categoria']]);
+                $paymentHistory->execute([$partnerId, $categoryId]);
+                $hasHistory = (bool)$paymentHistory->fetchColumn();
+                if (!$hasHistory) {
+                    $registrationHistory->execute([$partnerId, $categoryId]);
+                    $hasHistory = (bool)$registrationHistory->fetchColumn();
+                }
+
+                // Si se agregó y se quitó dentro del mismo mes sin registrar
+                // nada, no existe una vigencia histórica real: se elimina la
+                // asignación y desaparecen inmediatamente todas sus deudas.
+                if ((string)$row['fecha_desde'] >= $currentMonthStart && !$hasHistory) {
+                    $db->prepare('DELETE FROM socio_categorias WHERE id_socio_categoria = ?')
+                        ->execute([$row['id_socio_categoria']]);
+                    continue;
+                }
+
+                // Para una categoría con historia, la baja corta obligaciones
+                // desde el mes actual. Se conserva únicamente hasta el cierre
+                // del mes anterior. Si comenzó este mismo mes y ya tiene un
+                // pago, se conserva ese mes histórico sin generar meses futuros.
+                $until = (string)$row['fecha_desde'] <= $previousMonthEnd
+                    ? $previousMonthEnd
+                    : $currentMonthEnd;
+                $db->prepare(
+                    'UPDATE socio_categorias
+                     SET activo = 0, fecha_hasta = ?, id_categoria_activa = NULL
+                     WHERE id_socio_categoria = ?'
+                )->execute([$until, $row['id_socio_categoria']]);
             }
         }
         foreach ($categoryIds as $categoryId) {

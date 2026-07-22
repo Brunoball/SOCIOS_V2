@@ -85,16 +85,24 @@ final class Dashboard
 
         $paymentOperations = self::count(
             $db,
-            "SELECT COUNT(DISTINCT COALESCE(NULLIF(codigo_operacion, ''), CONCAT('PAGO-', id_pago)))
-             FROM pagos
-             WHERE estado = 'PAGADO' AND fecha_pago >= ? AND fecha_pago < ?",
-            [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')]
-        ) + self::count(
-            $db,
-            "SELECT COUNT(DISTINCT COALESCE(NULLIF(codigo_operacion, ''), CONCAT('INSCRIPCION-', id_pago_inscripcion)))
-             FROM pagos_inscripciones
-             WHERE estado = 'PAGADO' AND fecha_pago >= ? AND fecha_pago < ?",
-            [$monthStart->format('Y-m-d'), $monthEnd->format('Y-m-d')]
+            "SELECT COUNT(DISTINCT operacion)
+             FROM (
+                 SELECT COALESCE(NULLIF(codigo_operacion, ''), CONCAT('PAGO-', id_pago)) AS operacion
+                 FROM pagos
+                 WHERE estado = 'PAGADO' AND fecha_pago >= ? AND fecha_pago < ?
+
+                 UNION ALL
+
+                 SELECT COALESCE(NULLIF(codigo_operacion, ''), CONCAT('INSCRIPCION-', id_pago_inscripcion)) AS operacion
+                 FROM pagos_inscripciones
+                 WHERE estado = 'PAGADO' AND fecha_pago >= ? AND fecha_pago < ?
+             ) operaciones",
+            [
+                $monthStart->format('Y-m-d'),
+                $monthEnd->format('Y-m-d'),
+                $monthStart->format('Y-m-d'),
+                $monthEnd->format('Y-m-d'),
+            ]
         );
 
         $configuration = self::configurationStatus($db);
@@ -263,26 +271,41 @@ final class Dashboard
             "SELECT tipo, fecha, creado, titulo, detalle, importe
              FROM (
                  SELECT 'INGRESO_SOCIOS' AS tipo,
-                        MAX(p.fecha_pago) AS fecha,
-                        MAX(p.created_at) AS creado,
-                        'CUOTAS DE SOCIOS' AS titulo,
+                        MAX(cobros.fecha) AS fecha,
+                        MAX(cobros.creado) AS creado,
+                        CASE
+                            WHEN SUM(cobros.es_cuota) > 0 AND SUM(cobros.es_inscripcion) > 0
+                                THEN 'CUOTAS E INSCRIPCIONES'
+                            WHEN SUM(cobros.es_cuota) > 0
+                                THEN 'CUOTAS DE SOCIOS'
+                            ELSE 'INSCRIPCIONES'
+                        END AS titulo,
                         CONCAT(COUNT(*), IF(COUNT(*) = 1, ' imputación', ' imputaciones')) AS detalle,
-                        SUM(p.monto) AS importe
-                 FROM pagos p
-                 WHERE p.estado = 'PAGADO'
-                 GROUP BY COALESCE(NULLIF(p.codigo_operacion, ''), CONCAT('PAGO-', p.id_pago))
+                        SUM(cobros.importe) AS importe
+                 FROM (
+                     SELECT
+                         COALESCE(NULLIF(p.codigo_operacion, ''), CONCAT('PAGO-', p.id_pago)) AS operacion,
+                         p.fecha_pago AS fecha,
+                         p.created_at AS creado,
+                         p.monto AS importe,
+                         1 AS es_cuota,
+                         0 AS es_inscripcion
+                     FROM pagos p
+                     WHERE p.estado = 'PAGADO'
 
-                 UNION ALL
+                     UNION ALL
 
-                 SELECT 'INGRESO_SOCIOS' AS tipo,
-                        MAX(pi.fecha_pago) AS fecha,
-                        MAX(pi.created_at) AS creado,
-                        'INSCRIPCIONES' AS titulo,
-                        CONCAT(COUNT(*), IF(COUNT(*) = 1, ' imputación', ' imputaciones')) AS detalle,
-                        SUM(pi.monto) AS importe
-                 FROM pagos_inscripciones pi
-                 WHERE pi.estado = 'PAGADO'
-                 GROUP BY COALESCE(NULLIF(pi.codigo_operacion, ''), CONCAT('INSCRIPCION-', pi.id_pago_inscripcion))
+                     SELECT
+                         COALESCE(NULLIF(pi.codigo_operacion, ''), CONCAT('INSCRIPCION-', pi.id_pago_inscripcion)) AS operacion,
+                         pi.fecha_pago AS fecha,
+                         pi.created_at AS creado,
+                         pi.monto AS importe,
+                         0 AS es_cuota,
+                         1 AS es_inscripcion
+                     FROM pagos_inscripciones pi
+                     WHERE pi.estado = 'PAGADO'
+                 ) cobros
+                 GROUP BY cobros.operacion
 
                  UNION ALL
 

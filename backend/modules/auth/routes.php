@@ -21,6 +21,74 @@ function auth_login_audit(PDO $master, ?array $candidate, string $usuario, bool 
     }
 }
 
+function auth_login_lock_status(PDO $master, string $usuario): array
+{
+    try {
+        $statement = $master->prepare(
+            "SELECT
+                idLog,
+                GREATEST(
+                    0,
+                    TIMESTAMPDIFF(SECOND, NOW(), DATE_ADD(creado_en, INTERVAL 15 MINUTE))
+                ) AS reintentar_en_segundos
+             FROM login_auditoria
+             WHERE usuario = :usuario_fallos
+               AND exito = 0
+               AND idLog > COALESCE((
+                   SELECT MAX(exitoso.idLog)
+                   FROM login_auditoria exitoso
+                   WHERE exitoso.usuario = :usuario_exitos
+                     AND exitoso.exito = 1
+               ), 0)
+               AND creado_en > DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+             ORDER BY idLog DESC
+             LIMIT 5"
+        );
+        $statement->execute([
+            'usuario_fallos' => $usuario,
+            'usuario_exitos' => $usuario,
+        ]);
+        $attempts = $statement->fetchAll();
+
+        if (count($attempts) < 5) {
+            return [
+                'bloqueado' => false,
+                'intentos_fallidos' => count($attempts),
+                'reintentar_en_segundos' => 0,
+            ];
+        }
+
+        $retryAfter = max(0, (int)($attempts[0]['reintentar_en_segundos'] ?? 0));
+        return [
+            'bloqueado' => $retryAfter > 0,
+            'intentos_fallidos' => count($attempts),
+            'reintentar_en_segundos' => $retryAfter,
+        ];
+    } catch (Throwable $error) {
+        // El login no debe quedar inutilizable si la tabla de auditoría todavía
+        // no existe durante una instalación o migración incompleta.
+        error_log('No se pudo verificar el bloqueo de login: ' . $error->getMessage());
+        return [
+            'bloqueado' => false,
+            'intentos_fallidos' => 0,
+            'reintentar_en_segundos' => 0,
+        ];
+    }
+}
+
+function auth_reject_locked_login(array $lock): never
+{
+    $seconds = max(1, (int)($lock['reintentar_en_segundos'] ?? 900));
+    $minutes = max(1, (int)ceil($seconds / 60));
+    header('Retry-After: ' . $seconds);
+    api_error(
+        "Demasiados intentos fallidos. Este usuario está bloqueado. Intentá nuevamente en {$minutes} minuto" . ($minutes === 1 ? '.' : 's.'),
+        'LOGIN_LOCKED',
+        429,
+        ['reintentar_en_segundos' => $seconds]
+    );
+}
+
 function auth_cookie(string $token, int $expires): void
 {
     $secure = env_bool('SESSION_COOKIE_SECURE', (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'));
@@ -42,6 +110,9 @@ function auth_login(): never
     if (strlen($password) > 255) api_error('Las credenciales no son válidas.', 'INVALID_CREDENTIALS', 401);
 
     $master = master_db();
+    $lock = auth_login_lock_status($master, $usuario);
+    if ($lock['bloqueado']) auth_reject_locked_login($lock);
+
     $statement = $master->prepare(
         'SELECT
             u.idUsuarioMaster, u.idTenant, u.usuario, u.hash_contrasena, u.rol, u.activo AS usuario_activo,
@@ -64,6 +135,8 @@ function auth_login(): never
 
     if (count($matched) !== 1) {
         auth_login_audit($master, $candidates[0] ?? null, $usuario, false);
+        $lock = auth_login_lock_status($master, $usuario);
+        if ($lock['bloqueado']) auth_reject_locked_login($lock);
         api_error('Usuario o contraseña incorrectos.', 'INVALID_CREDENTIALS', 401);
     }
 

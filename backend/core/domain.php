@@ -92,7 +92,27 @@ function audit_change(PDO $db, array $auth, string $module, string $action, stri
          (id_usuario_master, modulo, accion, tabla_afectada, id_registro, descripcion, datos_anteriores, datos_nuevos, ip, user_agent)
          VALUES (:usuario, :modulo, :accion, :tabla, :registro, :descripcion, :antes, :despues, :ip, :agente)'
     );
-    $encode = static fn(mixed $data): ?string => $data === null ? null : json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $encode = static function (mixed $data): ?string {
+        if ($data === null) return null;
+
+        // La auditoría nunca debe tirar abajo la operación principal por un
+        // texto histórico con bytes UTF-8 inválidos, NAN/INF u otro valor no
+        // serializable de forma estricta. JSON_PARTIAL_OUTPUT_ON_ERROR conserva
+        // el resto del contenido y JSON_INVALID_UTF8_SUBSTITUTE reemplaza solo
+        // los bytes dañados.
+        $json = json_encode(
+            $data,
+            JSON_UNESCAPED_UNICODE
+                | JSON_UNESCAPED_SLASHES
+                | JSON_INVALID_UTF8_SUBSTITUTE
+                | JSON_PARTIAL_OUTPUT_ON_ERROR
+                | JSON_PRESERVE_ZERO_FRACTION
+        );
+
+        return is_string($json)
+            ? $json
+            : '{"error":"No se pudo serializar el detalle de auditoría."}';
+    };
     $statement->execute([
         'usuario' => $auth['id_usuario_master'],
         'modulo' => $module,

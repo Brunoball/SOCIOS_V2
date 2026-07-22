@@ -161,9 +161,9 @@ abstract class CuotasConsultas extends CuotasSoporte
         foreach ($assignments as $assignment) {
             $start = new DateTimeImmutable(substr((string)$assignment['fecha_desde'], 0, 7) . '-01');
             $end = $listingEndMonth;
-            if ($assignment['fecha_hasta'] && $assignment['fecha_hasta'] !== '9999-12-31') {
-                $assignmentEnd = new DateTimeImmutable(substr((string)$assignment['fecha_hasta'], 0, 7) . '-01');
-                if ($assignmentEnd < $end) $end = $assignmentEnd;
+            $assignmentEnd = self::lastChargeableMonth($assignment['fecha_hasta'] ?? null);
+            if ($assignmentEnd !== null && $assignmentEnd < $end) {
+                $end = $assignmentEnd;
             }
             if ($start > $end) continue;
 
@@ -473,9 +473,9 @@ abstract class CuotasConsultas extends CuotasSoporte
             $start = new DateTimeImmutable(substr((string)$assignment['fecha_desde'], 0, 7) . '-01');
             $earliestYear = min($earliestYear, (int)$start->format('Y'));
             $end = $endOfEnabledYear;
-            if ($assignment['fecha_hasta'] && $assignment['fecha_hasta'] !== '9999-12-31') {
-                $assignmentEnd = new DateTimeImmutable(substr((string)$assignment['fecha_hasta'], 0, 7) . '-01');
-                if ($assignmentEnd < $end) $end = $assignmentEnd;
+            $assignmentEnd = self::lastChargeableMonth($assignment['fecha_hasta'] ?? null);
+            if ($assignmentEnd !== null && $assignmentEnd < $end) {
+                $end = $assignmentEnd;
             }
             if ($start > $end) continue;
 
@@ -525,10 +525,16 @@ abstract class CuotasConsultas extends CuotasSoporte
         }
         unset($registration);
 
+        // El selector del modal se arma con categorías que realmente tienen
+        // algún período válido. Una asignación quitada en el mismo mes ya no
+        // queda visible como opción vacía ni vuelve a generar deuda fantasma.
         $categories = [];
-        foreach ($assignments as $assignment) {
-            $id = (int)$assignment['id_categoria'];
-            $categories[$id] = ['id_categoria' => $id, 'nombre' => $assignment['categoria']];
+        foreach ($periods as $period) {
+            $id = (int)$period['id_categoria'];
+            $categories[$id] = [
+                'id_categoria' => $id,
+                'nombre' => (string)$period['categoria'],
+            ];
         }
 
         $years = [];

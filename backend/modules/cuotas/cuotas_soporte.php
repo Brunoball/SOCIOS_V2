@@ -17,6 +17,26 @@ abstract class CuotasSoporte
         return (int)date('Y') + 1;
     }
 
+    /**
+     * Convierte una fecha de fin de vigencia en el último mes realmente
+     * exigible. Si la baja ocurrió antes del último día del mes, ese mes ya no
+     * genera deuda. Esto también corrige historiales viejos cerrados a mitad de
+     * mes por versiones anteriores del sistema.
+     */
+    protected static function lastChargeableMonth(?string $endDate): ?DateTimeImmutable
+    {
+        $endDate = trim((string)$endDate);
+        if ($endDate === '' || $endDate === '9999-12-31') return null;
+
+        $date = new DateTimeImmutable($endDate);
+        $monthStart = $date->modify('first day of this month');
+        $monthEnd = $date->modify('last day of this month');
+
+        return $date < $monthEnd
+            ? $monthStart->modify('-1 month')
+            : $monthStart;
+    }
+
     protected static function allowedRecipients(PDO $db, int $principalId, bool $applyFamily): array
     {
         $statement = $db->prepare('SELECT id_socio, activo FROM socios WHERE id_socio = ?');
@@ -88,7 +108,7 @@ abstract class CuotasSoporte
                )
              LIMIT 1'
         );
-        $statement->execute([$partnerId, $categoryId, $end, $start, $end, $start, $end, $start]);
+        $statement->execute([$partnerId, $categoryId, $end, $end, $end, $end, $end, $end]);
         return (bool)$statement->fetchColumn();
     }
 

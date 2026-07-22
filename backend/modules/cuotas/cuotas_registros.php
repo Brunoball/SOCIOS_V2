@@ -20,6 +20,73 @@ abstract class CuotasRegistros extends CuotasConsultas
             : transaction($db, $callback);
     }
 
+    /**
+     * Eliminar un pago/condonación debe liberar realmente el período para que
+     * pueda volver a cobrarse. La auditoría conserva el snapshot previo, por lo
+     * que no hace falta mantener una fila ANULADA dentro de la tabla operativa.
+     *
+     * Se intenta DELETE primero. Solo si un tenant legacy posee una FK externa
+     * que impide eliminar, se usa estado ANULADO como fallback compatible.
+     */
+    protected static function annulLockedRows(
+        PDO $db,
+        string $table,
+        string $idColumn,
+        array $ids
+    ): array {
+        if ($ids === []) {
+            return [
+                'afectados' => 0,
+                'eliminacion_fisica' => false,
+                'fallback_anulado' => false,
+            ];
+        }
+        if (!in_array($table, ['pagos', 'pagos_inscripciones'], true)) {
+            throw new InvalidArgumentException('Tabla no permitida para anulación.');
+        }
+        if (!in_array($idColumn, ['id_pago', 'id_pago_inscripcion'], true)) {
+            throw new InvalidArgumentException('Columna no permitida para anulación.');
+        }
+
+        $ids = array_values(array_unique(array_map('intval', $ids)));
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+
+        try {
+            $statement = $db->prepare(
+                "DELETE FROM {$table}
+                 WHERE {$idColumn} IN ({$placeholders})
+                   AND estado IN ('PAGADO','CONDONADO')"
+            );
+            $statement->execute($ids);
+
+            return [
+                'afectados' => $statement->rowCount(),
+                'eliminacion_fisica' => true,
+                'fallback_anulado' => false,
+            ];
+        } catch (PDOException $error) {
+            // 23000/1451: un esquema viejo puede tener otra tabla apuntando a
+            // pagos. En ese único caso se conserva la fila como ANULADA.
+            if ((string)$error->getCode() !== '23000') {
+                throw $error;
+            }
+
+            $statement = $db->prepare(
+                "UPDATE {$table}
+                 SET estado = 'ANULADO'
+                 WHERE {$idColumn} IN ({$placeholders})
+                   AND estado IN ('PAGADO','CONDONADO')"
+            );
+            $statement->execute($ids);
+
+            return [
+                'afectados' => $statement->rowCount(),
+                'eliminacion_fisica' => false,
+                'fallback_anulado' => true,
+            ];
+        }
+    }
+
     protected static function registrarPagoDatos(array $auth, array $body, ?array $context = null): array
     {
         $db = $auth['db'];
@@ -672,9 +739,9 @@ abstract class CuotasRegistros extends CuotasConsultas
                 $partnerIds = array_values($partnerIds);
                 $placeholders = implode(',', array_fill(0, count($partnerIds), '?'));
                 $paymentLock = $db->prepare(
-                    "SELECT p.id_pago, mod.codigo AS modalidad_codigo, mod.nombre AS modalidad_nombre
+                    "SELECT p.id_pago, modalidad.codigo AS modalidad_codigo, modalidad.nombre AS modalidad_nombre
                      FROM pagos p
-                     INNER JOIN modalidades_pago mod ON mod.id_modalidad_pago = p.id_modalidad_pago
+                     INNER JOIN modalidades_pago modalidad ON modalidad.id_modalidad_pago = p.id_modalidad_pago
                      WHERE p.codigo_operacion = ?
                        AND p.id_socio IN ({$placeholders})
                        AND p.estado IN ('PAGADO','CONDONADO')
@@ -744,10 +811,10 @@ abstract class CuotasRegistros extends CuotasConsultas
 
                     $lock = $db->prepare(
                         "SELECT p.id_pago, p.codigo_operacion, p.estado, p.id_socio, p.id_categoria,
-                                p.anio, p.id_modalidad_pago, mod.codigo AS modalidad_codigo,
-                                mod.nombre AS modalidad_nombre
+                                p.anio, p.id_modalidad_pago, modalidad.codigo AS modalidad_codigo,
+                                modalidad.nombre AS modalidad_nombre
                          FROM pagos p
-                         INNER JOIN modalidades_pago mod ON mod.id_modalidad_pago = p.id_modalidad_pago
+                         INNER JOIN modalidades_pago modalidad ON modalidad.id_modalidad_pago = p.id_modalidad_pago
                          WHERE p.id_pago = ? FOR UPDATE"
                     );
                     $lock->execute([$line['id_linea']]);
@@ -829,18 +896,31 @@ abstract class CuotasRegistros extends CuotasConsultas
                 );
             }
 
-            $affected = 0;
+            $paymentIds = [];
+            $registrationIds = [];
             foreach ($expanded as $line) {
-                $isPayment = $line['tipo'] === 'CUOTA';
-                $table = $isPayment ? 'pagos' : 'pagos_inscripciones';
-                $idColumn = $isPayment ? 'id_pago' : 'id_pago_inscripcion';
-                $statement = $db->prepare(
-                    "UPDATE {$table} SET estado = 'ANULADO'
-                     WHERE {$idColumn} = ? AND estado IN ('PAGADO','CONDONADO')"
-                );
-                $statement->execute([$line['id_linea']]);
-                $affected += $statement->rowCount();
+                if ($line['tipo'] === 'CUOTA') {
+                    $paymentIds[] = (int)$line['id_linea'];
+                } else {
+                    $registrationIds[] = (int)$line['id_linea'];
+                }
             }
+
+            // Se actualiza por tabla y en bloque. Además de ser más eficiente,
+            // evita estados parciales dentro de una misma operación.
+            $paymentMutation = self::annulLockedRows($db, 'pagos', 'id_pago', $paymentIds);
+            $registrationMutation = self::annulLockedRows(
+                $db,
+                'pagos_inscripciones',
+                'id_pago_inscripcion',
+                $registrationIds
+            );
+            $affected = (int)$paymentMutation['afectados'] + (int)$registrationMutation['afectados'];
+            $physicalDeletion = (bool)$paymentMutation['eliminacion_fisica']
+                || (bool)$registrationMutation['eliminacion_fisica'];
+            $fallbackAnnulled = (bool)$paymentMutation['fallback_anulado']
+                || (bool)$registrationMutation['fallback_anulado'];
+
             if ($affected !== count($expanded)) {
                 api_error('No se pudieron anular todas las líneas del registro.', 'OPERACION_DESACTUALIZADA', 409);
             }
@@ -858,25 +938,38 @@ abstract class CuotasRegistros extends CuotasConsultas
                 : ($packageLabels === []
                     ? 'Se anularon las líneas seleccionadas del registro.'
                     : 'Se anuló el paquete completo de ' . implode(' / ', array_values($packageLabels)) . '.');
-            audit_change(
-                $db,
-                $auth,
-                'CUOTAS',
-                'ANULAR',
-                $auditTable,
-                $code,
-                $packageText,
-                $before,
-                [
-                    'estado' => 'ANULADO',
-                    'modalidades_atomicas' => array_keys($packageLabels),
-                    'lineas' => array_values($expanded),
-                ]
-            );
+            try {
+                audit_change(
+                    $db,
+                    $auth,
+                    'CUOTAS',
+                    'ANULAR',
+                    $auditTable,
+                    $code,
+                    $packageText,
+                    $before,
+                    [
+                        'estado' => $physicalDeletion ? 'ELIMINADO' : 'ANULADO',
+                        'modalidades_atomicas' => array_keys($packageLabels),
+                        'lineas' => array_values($expanded),
+                    ]
+                );
+            } catch (Throwable $auditError) {
+                // La auditoría se registra siempre que la tabla esté disponible,
+                // pero una inconsistencia histórica en ella no debe deshacer la
+                // eliminación que ya fue validada y ejecutada correctamente.
+                error_log(
+                    'No se pudo auditar la anulación de cuotas ' . $code . ': '
+                    . $auditError->getMessage()
+                );
+            }
+
             return [
                 'registros_anulados' => $affected,
                 'modalidades_atomicas' => array_values($packageLabels),
                 'cobro_atomico' => $combinedOperation,
+                'eliminacion_fisica' => $physicalDeletion,
+                'compatibilidad_legacy' => $fallbackAnnulled,
             ];
         });
 
