@@ -31,13 +31,24 @@
   justify-self: auto;
 }
 
+.cuotas-head-filters .module-filter.cuotas-category-filter,
+.cuotas-head-filters .module-filter.cuotas-modality-filter,
+.cuotas-head-filters .module-filter.cuotas-month-filter {
+  width: 100%;
+  max-width: 140px;
+  flex: 0 1 140px;
+}
+
 .cuotas-debt-grid > :nth-child(4),
 .cuotas-debt-grid > :nth-child(5),
 .cuotas-debt-grid > :nth-child(7),
 .cuotas-debt-grid > :nth-child(9),
+.cuotas-operation-grid > :nth-child(3),
 .cuotas-operation-grid > :nth-child(4),
+.cuotas-operation-grid > :nth-child(5),
 .cuotas-operation-grid > :nth-child(7),
 .cuotas-operation-grid > :nth-child(9) {
+  align-items: center;
   justify-content: center;
   text-align: center;
 }
@@ -60,6 +71,43 @@
 
 .cuotas-output-actions--bottom {
   display: none;
+}
+
+.module-card__actions .mov-btn.cuotas-header-output-action {
+  height: 44px;
+  padding: 0 12px;
+  border-color: color-mix(in srgb, var(--balto-action) 28%, var(--mov-border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--balto-action) 8%, #fff);
+  box-shadow: none;
+  color: var(--balto-action);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.module-card__actions .mov-btn.cuotas-header-output-action svg {
+  font-size: 13px;
+}
+
+.module-card__actions .mov-btn.cuotas-header-output-action:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--balto-action) 48%, var(--mov-border));
+  background: color-mix(in srgb, var(--balto-action) 14%, #fff);
+  box-shadow: 0 5px 12px color-mix(in srgb, var(--balto-action) 14%, transparent);
+  transform: translateY(-1px);
+}
+
+.module-card__actions .mov-btn.cuotas-header-output-action--excel {
+  border-color: color-mix(in srgb, #218653 42%, var(--mov-border));
+  background: color-mix(in srgb, #218653 10%, #fff);
+  color: #187345;
+}
+
+.module-card__actions
+  .mov-btn.cuotas-header-output-action--excel:hover:not(:disabled) {
+  border-color: color-mix(in srgb, #218653 62%, var(--mov-border));
+  background: color-mix(in srgb, #218653 17%, #fff);
+  box-shadow: 0 5px 12px color-mix(in srgb, #218653 18%, transparent);
+  color: #126039;
 }
 
 @media (max-width: 1499px) {

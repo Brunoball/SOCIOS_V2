@@ -754,6 +754,7 @@ export default function Cuotas() {
       key: "categoria",
       label: "Categoría",
       type: "select",
+      className: "cuotas-category-filter",
       placeholder: "Todas",
       value: category,
       onChange: setCategory,
@@ -768,6 +769,7 @@ export default function Cuotas() {
             key: "modalidad",
             label: "Concepto / modalidad",
             type: "select",
+            className: "cuotas-modality-filter",
             placeholder: "Todos",
             value: modality,
             onChange: setModality,
@@ -806,6 +808,7 @@ export default function Cuotas() {
             key: "mes",
             label: "Mes aplicado",
             type: "select",
+            className: "cuotas-month-filter",
             includeEmptyOption: false,
             value: month,
             onChange: setMonth,
@@ -824,7 +827,8 @@ export default function Cuotas() {
       icon: faPrint,
       onClick: printTable,
       disabled: !items.length,
-      className: "mov-btn--ghost cuotas-header-output-action",
+      className:
+        "mov-btn--ghost cuotas-header-output-action cuotas-header-output-action--print",
     },
     {
       key: "excel",
@@ -832,7 +836,8 @@ export default function Cuotas() {
       icon: faFileExcel,
       onClick: exportTable,
       disabled: !items.length,
-      className: "mov-btn--ghost cuotas-header-output-action",
+      className:
+        "mov-btn--ghost cuotas-header-output-action cuotas-header-output-action--excel",
     },
   ];
 
@@ -1025,15 +1030,15 @@ export default function Cuotas() {
                     <strong>{item.modalidad_label || item.concepto}</strong>
                     <small>{item.periodos_label}</small>
                   </div>
-                  <div className="mov-gridCell">
+                  <div className="mov-gridCell is-center">
                     <span className="entity-wrap-text">
                       {item.categorias_label}
                     </span>
                   </div>
-                  <div className="mov-gridCell entity-main-cell">
+                  <div className="mov-gridCell entity-main-cell is-center">
                     <strong>{formatDate(item.fecha_pago)}</strong>
                   </div>
-                  <div className="mov-gridCell">
+                  <div className="mov-gridCell is-center">
                     <span className="entity-wrap-text">{item.medio_pago}</span>
                   </div>
                   <div className="mov-gridCell is-strong">

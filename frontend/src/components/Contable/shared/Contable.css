@@ -5,7 +5,7 @@
   display: flex !important;
   flex-wrap: nowrap;
   align-items: end;
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 
 .contable-head-filters > .module-filter--select {
@@ -43,8 +43,8 @@
   flex: 1 1 170px;
   min-width: 170px;
   max-width: 250px;
-  margin-left: 0;
-  justify-self: start;
+  margin-left: auto;
+  justify-self: end;
 }
 
 .contable-table .entity-table-wrap {
@@ -123,20 +123,24 @@
   min-width: 0;
 }
 
+.contable-grid--partners > :nth-child(3),
 .contable-grid--partners > :nth-child(4),
-.contable-grid--expense > :nth-child(3),
+.contable-grid--partners > :nth-child(5),
+.contable-grid--partners > :nth-child(6),
+.contable-grid--income > :nth-child(2),
+.contable-grid--income > :nth-child(4),
+.contable-grid--income > :nth-child(6),
 .contable-grid--income > :nth-child(7),
+.contable-grid--income-readonly > :nth-child(2),
+.contable-grid--income-readonly > :nth-child(4),
+.contable-grid--income-readonly > :nth-child(6),
+.contable-grid--expense > :nth-child(2),
+.contable-grid--expense > :nth-child(3),
+.contable-grid--expense > :nth-child(6),
+.contable-grid--expense > :nth-child(7),
 .contable-grid--expense > :nth-child(8) {
   justify-content: center;
   text-align: center;
-}
-
-.contable-grid--partners > :nth-child(6),
-.contable-grid--income > :nth-child(6),
-.contable-grid--income-readonly > :nth-child(6),
-.contable-grid--expense > :nth-child(7) {
-  justify-content: flex-end;
-  text-align: right;
 }
 
 .contable-category-summary {

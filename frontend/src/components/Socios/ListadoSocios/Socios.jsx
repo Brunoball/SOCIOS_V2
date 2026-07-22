@@ -550,6 +550,7 @@ export default function Socios() {
         title="Socios"
         filters={pageFilters}
         tabsInTitle
+        headFiltersClassName="socios-headFilters"
         primaryActionLabel="Nuevo socio"
         onPrimaryAction={openNew}
         canCreate={writable}

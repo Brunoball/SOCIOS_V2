@@ -913,7 +913,7 @@ export default function ContableModule({ view = "summary" }) {
                         <strong>{item.socio}</strong>
                         <small>{item.dni}</small>
                       </div>
-                      <div className="mov-gridCell">
+                      <div className="mov-gridCell is-center">
                         <span className="entity-wrap-text">
                           {item.categoria}
                         </span>
@@ -921,8 +921,8 @@ export default function ContableModule({ view = "summary" }) {
                       <div className="mov-gridCell is-center">
                         {item.periodo}
                       </div>
-                      <div className="mov-gridCell">{item.medio}</div>
-                      <div className="mov-gridCell is-right is-strong">
+                      <div className="mov-gridCell is-center">{item.medio}</div>
+                      <div className="mov-gridCell is-center is-strong">
                         {money(item.monto)}
                       </div>
                     </div>
@@ -947,14 +947,16 @@ export default function ContableModule({ view = "summary" }) {
                       <div className="mov-gridCell">
                         {formatDate(item.fecha)}
                       </div>
-                      <div className="mov-gridCell">{item.medio}</div>
+                      <div className="mov-gridCell is-center">{item.medio}</div>
                       <div className="mov-gridCell">{item.proveedor}</div>
-                      <div className="mov-gridCell">{item.categoria}</div>
+                      <div className="mov-gridCell is-center">
+                        {item.categoria}
+                      </div>
                       <div className="mov-gridCell entity-main-cell">
                         <strong>{item.concepto}</strong>
                         {item.detalle ? <small>{item.detalle}</small> : null}
                       </div>
-                      <div className="mov-gridCell is-right is-strong">
+                      <div className="mov-gridCell is-center is-strong">
                         {money(item.importe)}
                       </div>
                       {writable ? (
@@ -1003,7 +1005,9 @@ export default function ContableModule({ view = "summary" }) {
                       <div className="mov-gridCell">
                         {formatDate(item.fecha)}
                       </div>
-                      <div className="mov-gridCell">{item.categoria}</div>
+                      <div className="mov-gridCell is-center">
+                        {item.categoria}
+                      </div>
                       <div className="mov-gridCell is-center">
                         {item.numero_comprobante || "—"}
                       </div>
@@ -1012,8 +1016,8 @@ export default function ContableModule({ view = "summary" }) {
                         {item.detalle ? <small>{item.detalle}</small> : null}
                       </div>
                       <div className="mov-gridCell">{item.proveedor}</div>
-                      <div className="mov-gridCell">{item.medio}</div>
-                      <div className="mov-gridCell is-right is-strong">
+                      <div className="mov-gridCell is-center">{item.medio}</div>
+                      <div className="mov-gridCell is-center is-strong">
                         {money(item.importe)}
                       </div>
                       <div className="mov-gridCell mov-gridCell--actions">
