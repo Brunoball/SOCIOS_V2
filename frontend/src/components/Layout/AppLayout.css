@@ -610,12 +610,19 @@ body.pp-lockScroll{ overflow:hidden !important; }
   flex-direction:column;
   gap:6px;
   padding-left:0;
+  padding-top:0;
   max-height:0;
   opacity:0;
-  transform:translate3d(0,-4px,0);
+  transform:translate3d(0,-5px,0);
   overflow:hidden;
   pointer-events:none;
-  transition:max-height 240ms ease, opacity 160ms ease, transform 160ms ease;
+  visibility:hidden;
+  transition:
+    max-height 260ms cubic-bezier(.4,0,.2,1),
+    opacity 170ms ease,
+    transform 220ms cubic-bezier(.4,0,.2,1),
+    padding-top 220ms cubic-bezier(.4,0,.2,1),
+    visibility 0s linear 260ms;
   will-change:max-height, opacity, transform;
 }
 
@@ -624,7 +631,9 @@ body.pp-lockScroll{ overflow:hidden !important; }
   opacity:1;
   transform:translate3d(0,0,0);
   pointer-events:auto;
+  visibility:visible;
   padding-top:5px;
+  transition-delay:0s;
 }
 
 @media (min-width:721px){

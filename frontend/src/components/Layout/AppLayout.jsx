@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -68,6 +68,15 @@ const NAV_ITEMS = [
   },
 ];
 
+const GROUP_CLICK_DELAY = 0;
+
+const getGroupKeyForPath = (pathname) => (
+  NAV_ITEMS.find(
+    (item) => item.children
+      && (pathname === item.path || pathname.startsWith(`${item.path}/`))
+  )?.key || null
+);
+
 function LogoutModal({ open, onClose, onConfirm }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -98,8 +107,17 @@ export default function AppLayout() {
   const session = getSession();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [openGroupKey, setOpenGroupKey] = useState(() => getGroupKeyForPath(location.pathname));
+  const groupClickTimer = useRef(null);
 
-  useEffect(() => setDrawerOpen(false), [location.pathname]);
+  useEffect(() => {
+    setDrawerOpen(false);
+    setOpenGroupKey(getGroupKeyForPath(location.pathname));
+  }, [location.pathname]);
+
+  useEffect(() => () => {
+    if (groupClickTimer.current) clearTimeout(groupClickTimer.current);
+  }, []);
 
   const activeLabel = useMemo(() => {
     const configurationLabels = {
@@ -130,6 +148,38 @@ export default function AppLayout() {
       clearSession();
       navigate("/", { replace: true });
     }
+  };
+
+  const clearGroupClickTimer = () => {
+    if (!groupClickTimer.current) return;
+    clearTimeout(groupClickTimer.current);
+    groupClickTimer.current = null;
+  };
+
+  const toggleGroup = (item, event) => {
+    clearGroupClickTimer();
+
+    // El segundo clic pertenece al doble clic: la navegación se resuelve
+    // exclusivamente en handleGroupDoubleClick.
+    if (event.detail > 1) return;
+
+    groupClickTimer.current = setTimeout(() => {
+      setOpenGroupKey((currentKey) => (currentKey === item.key ? null : item.key));
+      groupClickTimer.current = null;
+    }, GROUP_CLICK_DELAY);
+  };
+
+  const handleGroupDoubleClick = (item, event) => {
+    event.preventDefault();
+    clearGroupClickTimer();
+    setOpenGroupKey(item.key);
+    setDrawerOpen(false);
+    navigate(item.defaultPath || item.path);
+  };
+
+  const closeOpenGroup = () => {
+    clearGroupClickTimer();
+    setOpenGroupKey(null);
   };
 
   return (
@@ -176,7 +226,7 @@ export default function AppLayout() {
         <nav className="pp-nav" aria-label="Navegación principal">
           {NAV_ITEMS.map((item) => {
             const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
-            const groupOpen = Boolean(item.children && active);
+            const groupOpen = Boolean(item.children && openGroupKey === item.key);
             return (
               <div className={`pp-navGroup ${item.children ? "has-sub" : ""} ${groupOpen ? "is-open" : ""}`} key={item.key}>
                 {item.external ? (
@@ -185,6 +235,7 @@ export default function AppLayout() {
                     type="button"
                     title="Abrir en una pestaña nueva"
                     onClick={() => {
+                      closeOpenGroup();
                       setDrawerOpen(false);
                       openAuthenticatedTab(item.path);
                     }}
@@ -192,16 +243,27 @@ export default function AppLayout() {
                     <span className="pp-nav__icon"><FontAwesomeIcon icon={item.icon} /></span><span className="pp-nav__label">{item.label}</span>
                   </button>
                 ) : item.children ? (
-                  <NavLink className={`pp-nav__item ${active ? "is-active" : ""}`} to={item.defaultPath || item.path}>
+                  <button
+                    className={`pp-nav__item ${active ? "is-active" : ""}`}
+                    type="button"
+                    aria-expanded={groupOpen}
+                    onClick={(event) => toggleGroup(item, event)}
+                    onDoubleClick={(event) => handleGroupDoubleClick(item, event)}
+                    title="Un clic para desplegar; doble clic para ingresar"
+                  >
                     <span className="pp-nav__icon"><FontAwesomeIcon icon={item.icon} /></span><span className="pp-nav__label">{item.label}</span>
-                  </NavLink>
+                  </button>
                 ) : (
-                  <NavLink className={({ isActive }) => `pp-nav__item ${isActive ? "is-active" : ""}`} to={item.path}>
+                  <NavLink
+                    className={({ isActive }) => `pp-nav__item ${isActive ? "is-active" : ""}`}
+                    to={item.path}
+                    onClick={closeOpenGroup}
+                  >
                     <span className="pp-nav__icon"><FontAwesomeIcon icon={item.icon} /></span><span className="pp-nav__label">{item.label}</span>
                   </NavLink>
                 )}
-                {item.children && groupOpen ? (
-                  <div className="pp-navSub">
+                {item.children ? (
+                  <div className="pp-navSub" aria-hidden={!groupOpen}>
                     {item.children.map((child) => (
                       <NavLink end className={({ isActive }) => `pp-navSub__item ${isActive ? "is-active" : ""}`} to={child.path} key={child.key}>
                         <span className="pp-navSub__dot" /><span className="pp-navSub__label">{child.label}</span>

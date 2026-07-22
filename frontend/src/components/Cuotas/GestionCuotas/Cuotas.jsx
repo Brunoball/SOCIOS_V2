@@ -20,6 +20,11 @@ import { FloatingField } from "../../Global/components/TabbedForm";
 import { canWrite } from "../../Global/auth/session";
 import { cuotasApi } from "../api/cuotasApi";
 import { useCuotas } from "../hooks/useCuotas";
+import ModalComprobantePago from "../../Global/Modales/ModalComprobantePago";
+import {
+  downloadPaymentReceiptPdf,
+  openPaymentReceipt,
+} from "../../../utils/comprobantePago";
 import "./Cuotas.css";
 import "./CuotasModal.css";
 
@@ -173,6 +178,9 @@ export default function Cuotas() {
   const [paymentDetail, setPaymentDetail] = useState(null);
   const [paymentForm, setPaymentForm] = useState(emptyPaymentForm());
   const [saving, setSaving] = useState(false);
+  const [paymentReceipt, setPaymentReceipt] = useState(null);
+  const [paymentReceiptOpen, setPaymentReceiptOpen] = useState(false);
+  const [paymentReceiptLoading, setPaymentReceiptLoading] = useState(false);
   const [deleteModal, setDeleteModal] = useState(null);
 
   useEffect(() => {
@@ -562,6 +570,76 @@ export default function Cuotas() {
     (paymentForm.incluir_inscripcion &&
       pendingRegistrationRecipients.length > 0);
 
+  const createPaymentReceiptDraft = (response = {}) => {
+    const familyDiscount = Number(
+      paymentDetail?.familia?.porcentaje_descuento || 0,
+    );
+    const selectedCategory = paymentDetail?.categorias?.find(
+      (item) =>
+        String(item.id_categoria) === String(paymentForm.id_categoria),
+    );
+    const paymentMethod = paymentDetail?.medios_pago?.find(
+      (item) =>
+        String(item.id_medio_pago) === String(paymentForm.id_medio_pago),
+    );
+    const feeLines = selectedPeriods.map((period) => ({
+      id: period.clave,
+      socio: period.socio,
+      categoria: period.categoria || selectedCategory?.nombre || "—",
+      periodo: period.periodo || `${period.mes} ${period.anio}`,
+      monto_base: Number(period.monto_base || 0),
+      porcentaje_descuento_familiar: familyDiscount,
+      monto: paymentForm.condonado ? 0 : Number(period.monto || 0),
+    }));
+    const registrationBase = Number(paymentForm.monto_inscripcion || 0);
+    const registrationLines = paymentForm.incluir_inscripcion
+      ? pendingRegistrationRecipients.map((member) => ({
+          id: `inscripcion-${member.id_socio}`,
+          socio: member.socio,
+          categoria: selectedCategory?.nombre || "—",
+          periodo: paymentForm.descripcion_inscripcion,
+          monto_base: registrationBase,
+          porcentaje_descuento_familiar: familyDiscount,
+          monto: paymentForm.condonado
+            ? 0
+            : registrationBase * (1 - familyDiscount / 100),
+        }))
+      : [];
+    const lineas = [...feeLines, ...registrationLines];
+
+    return {
+      codigo_operacion:
+        response.codigo_operacion ||
+        response.operacion?.codigo_operacion ||
+        response.codigo ||
+        "",
+      estado: paymentForm.condonado ? "CONDONADO" : "PAGADO",
+      fecha_pago: paymentForm.fecha_pago,
+      socios_label:
+        [...new Set(lineas.map((line) => line.socio).filter(Boolean))].join(
+          " · ",
+        ) || paymentDetail?.socio?.socio,
+      modalidad_label:
+        availableModalities.find(
+          (item) => item.codigo === paymentForm.modalidad,
+        )?.nombre ||
+        (paymentForm.incluir_inscripcion
+          ? "INSCRIPCIÓN"
+          : paymentForm.modalidad),
+      medio_pago: paymentForm.condonado
+        ? "CONDONACIÓN"
+        : paymentMethod?.nombre || "—",
+      monto_base: lineas.reduce(
+        (total, line) => total + Number(line.monto_base || 0),
+        0,
+      ),
+      monto: paymentTotal,
+      motivo_condonacion: paymentForm.motivo_condonacion,
+      observaciones: paymentForm.observaciones,
+      lineas,
+    };
+  };
+
   const changePaymentConcept = (concept) => {
     if (concept === "INSCRIPCION" && registrationAvailable) {
       setPaymentConcept("INSCRIPCION");
@@ -611,16 +689,45 @@ export default function Cuotas() {
         motivo_condonacion: paymentForm.motivo_condonacion,
         observaciones: paymentForm.observaciones,
       });
+      const receiptDraft = createPaymentReceiptDraft(response);
       setPaymentOpen(false);
-      setFeedback({
-        type: "success",
-        message: response.mensaje,
-      });
+      setFeedback(null);
+      setPaymentReceipt(receiptDraft);
+      setPaymentReceiptOpen(true);
+
+      const operationCode = receiptDraft.codigo_operacion;
+      if (operationCode) {
+        setPaymentReceiptLoading(true);
+        cuotasApi
+          .comprobante(operationCode)
+          .then((officialReceipt) => setPaymentReceipt(officialReceipt))
+          .catch(() => {
+            // El resumen local permanece disponible si falla la consulta extra.
+          })
+          .finally(() => setPaymentReceiptLoading(false));
+      } else {
+        setPaymentReceiptLoading(false);
+      }
       await cargar();
     } catch (err) {
       setFeedback({ type: "error", message: err.message });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openReceiptOutput = (asPdf = false) => {
+    if (!paymentReceipt) return;
+    const completed = asPdf
+      ? downloadPaymentReceiptPdf(paymentReceipt)
+      : openPaymentReceipt(paymentReceipt, { openPrintDialog: true });
+    if (!completed) {
+      setFeedback({
+        type: "error",
+        message: asPdf
+          ? "No se pudo generar el PDF del comprobante. Intentá nuevamente."
+          : "El navegador bloqueó la ventana del comprobante. Habilitá las ventanas emergentes e intentá nuevamente.",
+      });
     }
   };
 
@@ -1551,6 +1658,17 @@ export default function Cuotas() {
           </div>
         ) : null}
       </CrudModal>
+
+      {paymentReceipt ? (
+        <ModalComprobantePago
+          open={paymentReceiptOpen}
+          comprobante={paymentReceipt}
+          loading={paymentReceiptLoading}
+          onClose={() => setPaymentReceiptOpen(false)}
+          onPrint={() => openReceiptOutput(false)}
+          onExportPdf={() => openReceiptOutput(true)}
+        />
+      ) : null}
 
       <ModalEliminarGlobal
         open={Boolean(deleteModal)}
