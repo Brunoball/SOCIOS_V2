@@ -238,6 +238,20 @@
   cursor: not-allowed;
 }
 
+.cuotas-payment-concept-tabs button small {
+  min-width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: var(--balto-action);
+  background: rgba(196, 139, 59, 0.12);
+  font-size: 9px;
+  font-weight: 800;
+}
+
 .cuotas-payment-content {
   padding-top: 1px;
 }
@@ -379,27 +393,58 @@
   gap: 10px;
 }
 
-.cuotas-registration-amount {
-  display: grid;
-  align-content: center;
-  gap: 4px;
+.cuotas-registration-choice {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 11px;
   padding: 12px 14px;
   border: 1px solid rgba(196, 139, 59, 0.22);
   border-radius: 11px;
   background: rgba(196, 139, 59, 0.065);
+  cursor: pointer;
+  transition: 150ms ease;
 }
 
-.cuotas-registration-amount span {
-  color: var(--balto-text);
-  font-size: 9px;
-  font-weight: 750;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
+.cuotas-registration-choice.is-selected {
+  border-color: rgba(196, 139, 59, 0.58);
+  background: rgba(196, 139, 59, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(196, 139, 59, 0.16);
 }
 
-.cuotas-registration-amount strong {
+.cuotas-registration-choice input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--balto-action);
+}
+
+.cuotas-registration-choice > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.cuotas-registration-choice span {
+  color: var(--balto-ink);
+  font-size: 10px;
+  font-weight: 760;
+}
+
+.cuotas-registration-choice strong {
   color: var(--balto-action);
   font-size: 18px;
+}
+
+.cuotas-registration-choice small {
+  color: var(--balto-text);
+  font-size: 9px;
+}
+
+.cuotas-registration-choice.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
 }
 
 .cuotas-registration-members {

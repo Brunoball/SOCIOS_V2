@@ -24,6 +24,23 @@ final class Cuotas extends CuotasRegistros
         api_success(self::detalleSocioDatos($auth['db'], $id));
     }
 
+    public static function registrarCobro(): never
+    {
+        $auth = require_admin();
+        $result = self::registrarCobroDatos($auth, request_body());
+        $combined = $result['incluye_cuotas'] && $result['incluye_inscripcion'];
+        api_success(
+            $result,
+            $result['estado'] === 'CONDONADO'
+                ? ($combined
+                    ? 'Cuotas e inscripción condonadas correctamente.'
+                    : 'Condonación registrada correctamente.')
+                : ($combined
+                    ? 'Cuotas e inscripción pagadas en una sola operación.'
+                    : 'Pago registrado correctamente.')
+        );
+    }
+
     public static function registrarPago(): never
     {
         $auth = require_admin();

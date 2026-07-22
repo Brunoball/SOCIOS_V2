@@ -5,7 +5,22 @@ require_once __DIR__ . '/cuotas_consultas.php';
 
 abstract class CuotasRegistros extends CuotasConsultas
 {
-    protected static function registrarPagoDatos(array $auth, array $body): array
+    protected static function operationCodeFromContext(?array $context, string $fallbackPrefix): string
+    {
+        $provided = trim((string)($context['codigo_operacion'] ?? ''));
+        return $provided === ''
+            ? self::operationCode($fallbackPrefix)
+            : clean_text($provided, 64, false);
+    }
+
+    protected static function persistRegistration(PDO $db, ?array $context, callable $callback): mixed
+    {
+        return filter_var($context['sin_transaccion'] ?? false, FILTER_VALIDATE_BOOL)
+            ? $callback()
+            : transaction($db, $callback);
+    }
+
+    protected static function registrarPagoDatos(array $auth, array $body, ?array $context = null): array
     {
         $db = $auth['db'];
         $principalId = positive_id($body['id_socio'] ?? null, 'socio');
@@ -162,16 +177,17 @@ abstract class CuotasRegistros extends CuotasConsultas
         $categoryRows = self::categoryMap($db, $categoryIds);
         $prices = self::priceHistory($db, $categoryIds);
         $rules = self::discountRules($db);
-        $operationCode = self::operationCode($condoned ? 'COND-CUO' : 'CUO');
+        $operationCode = self::operationCodeFromContext($context, $condoned ? 'COND-CUO' : 'CUO');
+        $auditEnabled = !filter_var($context['sin_auditoria'] ?? false, FILTER_VALIDATE_BOOL);
         $state = $condoned ? 'CONDONADO' : 'PAGADO';
         $mediumName = self::paymentMediumName($db, $mediumId);
         $discountCache = [];
 
         try {
-            $saved = transaction($db, static function () use (
+            $saved = self::persistRegistration($db, $context, static function () use (
                 $db, $auth, $normalized, $modalityId, $modalityCode, $modalityLabel,
                 $categoryRows, $prices, $rules, $operationCode, $state, $mediumId,
-                $mediumName, $date, $observations, $reason, &$discountCache
+                $mediumName, $date, $observations, $reason, &$discountCache, $auditEnabled
             ): array {
                 $lines = [];
                 $charged = 0.0;
@@ -281,19 +297,21 @@ abstract class CuotasRegistros extends CuotasConsultas
                     $charged += $amount;
                 }
 
-                audit_change(
-                    $db,
-                    $auth,
-                    'CUOTAS',
-                    $state === 'CONDONADO' ? 'CONDONAR_CUOTAS' : 'REGISTRAR_PAGO',
-                    'pagos',
-                    $operationCode,
-                    $state === 'CONDONADO'
-                        ? 'Se condonó un registro de ' . $modalityLabel . '.'
-                        : 'Se registró un pago de ' . $modalityLabel . '.',
-                    null,
-                    ['codigo_operacion' => $operationCode, 'modalidad' => $modalityCode, 'lineas' => $lines]
-                );
+                if ($auditEnabled) {
+                    audit_change(
+                        $db,
+                        $auth,
+                        'CUOTAS',
+                        $state === 'CONDONADO' ? 'CONDONAR_CUOTAS' : 'REGISTRAR_PAGO',
+                        'pagos',
+                        $operationCode,
+                        $state === 'CONDONADO'
+                            ? 'Se condonó un registro de ' . $modalityLabel . '.'
+                            : 'Se registró un pago de ' . $modalityLabel . '.',
+                        null,
+                        ['codigo_operacion' => $operationCode, 'modalidad' => $modalityCode, 'lineas' => $lines]
+                    );
+                }
                 return [
                     'lineas' => count($lines),
                     'modalidad' => $modalityCode,
@@ -312,7 +330,7 @@ abstract class CuotasRegistros extends CuotasConsultas
         return ['codigo_operacion' => $operationCode, 'estado' => $state] + $saved;
     }
 
-    protected static function registrarInscripcionDatos(array $auth, array $body): array
+    protected static function registrarInscripcionDatos(array $auth, array $body, ?array $context = null): array
     {
         $db = $auth['db'];
         $principalId = positive_id($body['id_socio'] ?? null, 'socio');
@@ -359,7 +377,8 @@ abstract class CuotasRegistros extends CuotasConsultas
 
         $rules = self::discountRules($db);
         $discountCache = [];
-        $operationCode = self::operationCode($condoned ? 'COND-INS' : 'INS');
+        $operationCode = self::operationCodeFromContext($context, $condoned ? 'COND-INS' : 'INS');
+        $auditEnabled = !filter_var($context['sin_auditoria'] ?? false, FILTER_VALIDATE_BOOL);
         $state = $condoned ? 'CONDONADO' : 'PAGADO';
         $base = (float)$baseAmount;
         $category = self::categoryMap($db, [$categoryId])[$categoryId] ?? null;
@@ -368,9 +387,10 @@ abstract class CuotasRegistros extends CuotasConsultas
         $mediumName = self::paymentMediumName($db, $mediumId);
 
         try {
-            $saved = transaction($db, static function () use (
+            $saved = self::persistRegistration($db, $context, static function () use (
             $db, $auth, $recipients, $categoryId, $year, $base, $rules, &$discountCache,
-            $operationCode, $state, $mediumId, $mediumName, $categoryName, $date, $description, $observations, $reason
+            $operationCode, $state, $mediumId, $mediumName, $categoryName, $date, $description, $observations, $reason,
+            $auditEnabled
         ): array {
             $lines = [];
             $charged = 0.0;
@@ -432,17 +452,19 @@ abstract class CuotasRegistros extends CuotasConsultas
                 $charged += $amount;
             }
 
-            audit_change(
-                $db,
-                $auth,
-                'CUOTAS',
-                $state === 'CONDONADO' ? 'CONDONAR_INSCRIPCION' : 'REGISTRAR_INSCRIPCION',
-                'pagos_inscripciones',
-                $operationCode,
-                $state === 'CONDONADO' ? 'Se condonó una inscripción.' : 'Se registró un pago de inscripción.',
-                null,
-                ['codigo_operacion' => $operationCode, 'lineas' => $lines]
-            );
+            if ($auditEnabled) {
+                audit_change(
+                    $db,
+                    $auth,
+                    'CUOTAS',
+                    $state === 'CONDONADO' ? 'CONDONAR_INSCRIPCION' : 'REGISTRAR_INSCRIPCION',
+                    'pagos_inscripciones',
+                    $operationCode,
+                    $state === 'CONDONADO' ? 'Se condonó una inscripción.' : 'Se registró un pago de inscripción.',
+                    null,
+                    ['codigo_operacion' => $operationCode, 'lineas' => $lines]
+                );
+            }
             return [
                 'lineas' => count($lines),
                 'monto_teorico' => number_format($theoretical, 2, '.', ''),
@@ -455,6 +477,138 @@ abstract class CuotasRegistros extends CuotasConsultas
             }
             throw $error;
         }
+
+        return ['codigo_operacion' => $operationCode, 'estado' => $state] + $saved;
+    }
+
+    protected static function registrarCobroDatos(array $auth, array $body): array
+    {
+        $db = $auth['db'];
+        $obligations = is_array($body['obligaciones'] ?? null) ? $body['obligaciones'] : [];
+        $includeRegistration = filter_var(
+            $body['incluir_inscripcion'] ?? false,
+            FILTER_VALIDATE_BOOL
+        );
+
+        if (count($obligations) > 500) {
+            api_error('No se pueden registrar más de 500 cuotas por cobro.', 'VALIDATION_ERROR');
+        }
+        if ($obligations === [] && !$includeRegistration) {
+            api_error('Seleccioná al menos una cuota o incluí la inscripción.', 'VALIDATION_ERROR');
+        }
+
+        if ($includeRegistration && $obligations !== []) {
+            $registrationCategoryId = positive_id($body['id_categoria'] ?? null, 'categoría');
+            $registrationYear = filter_var($body['anio'] ?? null, FILTER_VALIDATE_INT, [
+                'options' => ['min_range' => 2000, 'max_range' => self::maximumEnabledYear()],
+            ]);
+            if ($registrationYear === false) {
+                api_error('El año del cobro combinado no es válido.', 'VALIDATION_ERROR');
+            }
+            foreach ($obligations as $obligation) {
+                if (!is_array($obligation)) {
+                    api_error('Una de las cuotas seleccionadas no es válida.', 'VALIDATION_ERROR');
+                }
+                if (
+                    (int)($obligation['id_categoria'] ?? 0) !== $registrationCategoryId
+                    || (int)($obligation['anio'] ?? 0) !== (int)$registrationYear
+                ) {
+                    api_error(
+                        'La inscripción y las cuotas del mismo cobro deben pertenecer a la misma categoría y año.',
+                        'COBRO_COMBINADO_INCONSISTENTE'
+                    );
+                }
+            }
+        }
+
+        $condoned = filter_var($body['condonado'] ?? false, FILTER_VALIDATE_BOOL);
+        $state = $condoned ? 'CONDONADO' : 'PAGADO';
+        $hasFees = $obligations !== [];
+        $operationPrefix = $hasFees && $includeRegistration
+            ? ($condoned ? 'COND-COB' : 'COB')
+            : ($hasFees
+                ? ($condoned ? 'COND-CUO' : 'CUO')
+                : ($condoned ? 'COND-INS' : 'INS'));
+        $operationCode = self::operationCode($operationPrefix);
+        $context = [
+            'codigo_operacion' => $operationCode,
+            'sin_transaccion' => true,
+            'sin_auditoria' => true,
+        ];
+
+        $saved = transaction($db, static function () use (
+            $db,
+            $auth,
+            $body,
+            $obligations,
+            $includeRegistration,
+            $context,
+            $operationCode,
+            $state
+        ): array {
+            $feesResult = null;
+            $registrationResult = null;
+
+            if ($obligations !== []) {
+                $feesBody = $body;
+                $feesBody['obligaciones'] = $obligations;
+                $feesResult = self::registrarPagoDatos($auth, $feesBody, $context);
+            }
+
+            if ($includeRegistration) {
+                $registrationResult = self::registrarInscripcionDatos($auth, $body, $context);
+            }
+
+            $rows = array_merge(
+                self::paymentRows($db, null, $operationCode),
+                self::registrationRows($db, null, $operationCode)
+            );
+            if ($rows === []) {
+                api_error('No se pudo registrar ninguna línea del cobro.', 'COBRO_SIN_LINEAS', 500);
+            }
+
+            $operation = self::groupOperations($rows)[0] ?? null;
+            $lineCount = (int)($feesResult['lineas'] ?? 0)
+                + (int)($registrationResult['lineas'] ?? 0);
+            $theoretical = (float)($feesResult['monto_teorico'] ?? 0)
+                + (float)($registrationResult['monto_teorico'] ?? 0);
+            $charged = (float)($feesResult['monto'] ?? 0)
+                + (float)($registrationResult['monto'] ?? 0);
+            $concepts = [];
+            if ($feesResult !== null) $concepts[] = 'cuotas';
+            if ($registrationResult !== null) $concepts[] = 'inscripción';
+            $conceptLabel = implode(' e ', $concepts);
+
+            audit_change(
+                $db,
+                $auth,
+                'CUOTAS',
+                $state === 'CONDONADO' ? 'CONDONAR_COBRO' : 'REGISTRAR_COBRO',
+                $feesResult !== null ? 'pagos' : 'pagos_inscripciones',
+                $operationCode,
+                $state === 'CONDONADO'
+                    ? 'Se condonó un cobro de ' . $conceptLabel . '.'
+                    : 'Se registró un cobro de ' . $conceptLabel . '.',
+                null,
+                [
+                    'codigo_operacion' => $operationCode,
+                    'incluye_cuotas' => $feesResult !== null,
+                    'incluye_inscripcion' => $registrationResult !== null,
+                    'lineas' => $operation['lineas'] ?? [],
+                    'monto' => number_format($charged, 2, '.', ''),
+                ]
+            );
+
+            return [
+                'lineas' => $lineCount,
+                'monto_teorico' => number_format($theoretical, 2, '.', ''),
+                'monto' => number_format($charged, 2, '.', ''),
+                'incluye_cuotas' => $feesResult !== null,
+                'incluye_inscripcion' => $registrationResult !== null,
+                'modalidad' => $operation['modalidad_codigo'] ?? null,
+                'modalidad_label' => $operation['modalidad_label'] ?? null,
+            ];
+        });
 
         return ['codigo_operacion' => $operationCode, 'estado' => $state] + $saved;
     }
@@ -483,78 +637,164 @@ abstract class CuotasRegistros extends CuotasConsultas
             $expanded = [];
             $packageLabels = [];
 
-            foreach ($requested as $line) {
-                if ($line['tipo'] === 'INSCRIPCION') {
+            $combinedOperation = preg_match('/^(?:COND-)?COB-/', $code) === 1;
+            if ($combinedOperation) {
+                $partnerIds = [];
+                foreach ($requested as $line) {
+                    $isPayment = $line['tipo'] === 'CUOTA';
+                    $table = $isPayment ? 'pagos' : 'pagos_inscripciones';
+                    $idColumn = $isPayment ? 'id_pago' : 'id_pago_inscripcion';
+                    $legacyPrefix = $isPayment ? 'PAGO-' : 'INSCRIPCION-';
+                    $requestedLock = $db->prepare(
+                        "SELECT {$idColumn}, id_socio, codigo_operacion, estado
+                         FROM {$table}
+                         WHERE {$idColumn} = ?
+                         FOR UPDATE"
+                    );
+                    $requestedLock->execute([$line['id_linea']]);
+                    $row = $requestedLock->fetch();
+                    $rowCode = $row
+                        ? (string)($row['codigo_operacion'] ?: $legacyPrefix . $line['id_linea'])
+                        : '';
+                    if (!$row || $rowCode !== $code) {
+                        api_error(
+                            'Una línea ya no pertenece al cobro mostrado. Actualizá la tabla.',
+                            'OPERACION_DESACTUALIZADA',
+                            409
+                        );
+                    }
+                    if (!in_array($row['estado'], self::ESTADOS_REGISTRADOS, true)) {
+                        api_error('Una línea seleccionada ya fue anulada.', 'OPERACION_SIN_CAMBIOS', 409);
+                    }
+                    $partnerIds[(int)$row['id_socio']] = (int)$row['id_socio'];
+                }
+
+                $partnerIds = array_values($partnerIds);
+                $placeholders = implode(',', array_fill(0, count($partnerIds), '?'));
+                $paymentLock = $db->prepare(
+                    "SELECT p.id_pago, mod.codigo AS modalidad_codigo, mod.nombre AS modalidad_nombre
+                     FROM pagos p
+                     INNER JOIN modalidades_pago mod ON mod.id_modalidad_pago = p.id_modalidad_pago
+                     WHERE p.codigo_operacion = ?
+                       AND p.id_socio IN ({$placeholders})
+                       AND p.estado IN ('PAGADO','CONDONADO')
+                     ORDER BY p.id_pago
+                     FOR UPDATE"
+                );
+                $paymentLock->execute([$code, ...$partnerIds]);
+                foreach ($paymentLock->fetchAll() as $row) {
+                    $paymentId = (int)$row['id_pago'];
+                    $expanded['CUOTA-' . $paymentId] = [
+                        'tipo' => 'CUOTA',
+                        'id_linea' => $paymentId,
+                    ];
+                    $modalityCode = self::upper((string)$row['modalidad_codigo']);
+                    if (self::isPackageModality($modalityCode)) {
+                        $packageLabels[$modalityCode] = (string)$row['modalidad_nombre'];
+                    }
+                }
+
+                $registrationLock = $db->prepare(
+                    "SELECT id_pago_inscripcion
+                     FROM pagos_inscripciones
+                     WHERE codigo_operacion = ?
+                       AND id_socio IN ({$placeholders})
+                       AND estado IN ('PAGADO','CONDONADO')
+                     ORDER BY id_pago_inscripcion
+                     FOR UPDATE"
+                );
+                $registrationLock->execute([$code, ...$partnerIds]);
+                foreach ($registrationLock->fetchAll() as $row) {
+                    $registrationId = (int)$row['id_pago_inscripcion'];
+                    $expanded['INSCRIPCION-' . $registrationId] = [
+                        'tipo' => 'INSCRIPCION',
+                        'id_linea' => $registrationId,
+                    ];
+                }
+
+                foreach ($requested as $key => $line) {
+                    if (!isset($expanded[$key])) {
+                        api_error(
+                            'Una línea ya no pertenece al cobro mostrado o ya fue anulada. Actualizá la tabla.',
+                            'OPERACION_DESACTUALIZADA',
+                            409
+                        );
+                    }
+                }
+            } else {
+                foreach ($requested as $line) {
+                    if ($line['tipo'] === 'INSCRIPCION') {
+                        $lock = $db->prepare(
+                            'SELECT id_pago_inscripcion, codigo_operacion, estado
+                             FROM pagos_inscripciones
+                             WHERE id_pago_inscripcion = ? FOR UPDATE'
+                        );
+                        $lock->execute([$line['id_linea']]);
+                        $row = $lock->fetch();
+                        $rowCode = $row ? (string)($row['codigo_operacion'] ?: 'INSCRIPCION-' . $line['id_linea']) : '';
+                        if (!$row || $rowCode !== $code) {
+                            api_error('Una línea ya no pertenece al registro mostrado. Actualizá la tabla.', 'OPERACION_DESACTUALIZADA', 409);
+                        }
+                        if (!in_array($row['estado'], self::ESTADOS_REGISTRADOS, true)) {
+                            api_error('Una línea seleccionada ya fue anulada.', 'OPERACION_SIN_CAMBIOS', 409);
+                        }
+                        $expanded['INSCRIPCION-' . $line['id_linea']] = $line;
+                        continue;
+                    }
+
                     $lock = $db->prepare(
-                        'SELECT id_pago_inscripcion, codigo_operacion, estado
-                         FROM pagos_inscripciones
-                         WHERE id_pago_inscripcion = ? FOR UPDATE'
+                        "SELECT p.id_pago, p.codigo_operacion, p.estado, p.id_socio, p.id_categoria,
+                                p.anio, p.id_modalidad_pago, mod.codigo AS modalidad_codigo,
+                                mod.nombre AS modalidad_nombre
+                         FROM pagos p
+                         INNER JOIN modalidades_pago mod ON mod.id_modalidad_pago = p.id_modalidad_pago
+                         WHERE p.id_pago = ? FOR UPDATE"
                     );
                     $lock->execute([$line['id_linea']]);
                     $row = $lock->fetch();
-                    $rowCode = $row ? (string)($row['codigo_operacion'] ?: 'INSCRIPCION-' . $line['id_linea']) : '';
+                    $rowCode = $row ? (string)($row['codigo_operacion'] ?: 'PAGO-' . $line['id_linea']) : '';
                     if (!$row || $rowCode !== $code) {
                         api_error('Una línea ya no pertenece al registro mostrado. Actualizá la tabla.', 'OPERACION_DESACTUALIZADA', 409);
                     }
                     if (!in_array($row['estado'], self::ESTADOS_REGISTRADOS, true)) {
                         api_error('Una línea seleccionada ya fue anulada.', 'OPERACION_SIN_CAMBIOS', 409);
                     }
-                    $expanded['INSCRIPCION-' . $line['id_linea']] = $line;
-                    continue;
-                }
 
-                $lock = $db->prepare(
-                    "SELECT p.id_pago, p.codigo_operacion, p.estado, p.id_socio, p.id_categoria,
-                            p.anio, p.id_modalidad_pago, mod.codigo AS modalidad_codigo,
-                            mod.nombre AS modalidad_nombre
-                     FROM pagos p
-                     INNER JOIN modalidades_pago mod ON mod.id_modalidad_pago = p.id_modalidad_pago
-                     WHERE p.id_pago = ? FOR UPDATE"
-                );
-                $lock->execute([$line['id_linea']]);
-                $row = $lock->fetch();
-                $rowCode = $row ? (string)($row['codigo_operacion'] ?: 'PAGO-' . $line['id_linea']) : '';
-                if (!$row || $rowCode !== $code) {
-                    api_error('Una línea ya no pertenece al registro mostrado. Actualizá la tabla.', 'OPERACION_DESACTUALIZADA', 409);
-                }
-                if (!in_array($row['estado'], self::ESTADOS_REGISTRADOS, true)) {
-                    api_error('Una línea seleccionada ya fue anulada.', 'OPERACION_SIN_CAMBIOS', 409);
-                }
+                    $modalityCode = self::upper((string)$row['modalidad_codigo']);
+                    if (!self::isPackageModality($modalityCode)) {
+                        $expanded['CUOTA-' . $line['id_linea']] = $line;
+                        continue;
+                    }
 
-                $modalityCode = self::upper((string)$row['modalidad_codigo']);
-                if (!self::isPackageModality($modalityCode)) {
-                    $expanded['CUOTA-' . $line['id_linea']] = $line;
-                    continue;
+                    // Los planes semestrales y anuales son atómicos: seleccionar
+                    // enero o cualquier otro mes anula el paquete completo del
+                    // socio, categoría y año, no una cuota aislada.
+                    $package = $db->prepare(
+                        "SELECT id_pago
+                         FROM pagos
+                         WHERE codigo_operacion = ?
+                           AND id_socio = ? AND id_categoria = ? AND anio = ?
+                           AND id_modalidad_pago = ?
+                           AND estado IN ('PAGADO','CONDONADO')
+                         ORDER BY id_mes
+                         FOR UPDATE"
+                    );
+                    $package->execute([
+                        $code,
+                        (int)$row['id_socio'],
+                        (int)$row['id_categoria'],
+                        (int)$row['anio'],
+                        (int)$row['id_modalidad_pago'],
+                    ]);
+                    $packageIds = array_map('intval', array_column($package->fetchAll(), 'id_pago'));
+                    if ($packageIds === []) {
+                        api_error('El pago semestral o anual ya no tiene líneas activas.', 'OPERACION_SIN_CAMBIOS', 409);
+                    }
+                    foreach ($packageIds as $packageId) {
+                        $expanded['CUOTA-' . $packageId] = ['tipo' => 'CUOTA', 'id_linea' => $packageId];
+                    }
+                    $packageLabels[$modalityCode] = (string)$row['modalidad_nombre'];
                 }
-
-                // Los planes semestrales y anuales son atómicos: seleccionar
-                // enero o cualquier otro mes anula el paquete completo del
-                // socio, categoría y año, no una cuota aislada.
-                $package = $db->prepare(
-                    "SELECT id_pago
-                     FROM pagos
-                     WHERE codigo_operacion = ?
-                       AND id_socio = ? AND id_categoria = ? AND anio = ?
-                       AND id_modalidad_pago = ?
-                       AND estado IN ('PAGADO','CONDONADO')
-                     ORDER BY id_mes
-                     FOR UPDATE"
-                );
-                $package->execute([
-                    $code,
-                    (int)$row['id_socio'],
-                    (int)$row['id_categoria'],
-                    (int)$row['anio'],
-                    (int)$row['id_modalidad_pago'],
-                ]);
-                $packageIds = array_map('intval', array_column($package->fetchAll(), 'id_pago'));
-                if ($packageIds === []) {
-                    api_error('El pago semestral o anual ya no tiene líneas activas.', 'OPERACION_SIN_CAMBIOS', 409);
-                }
-                foreach ($packageIds as $packageId) {
-                    $expanded['CUOTA-' . $packageId] = ['tipo' => 'CUOTA', 'id_linea' => $packageId];
-                }
-                $packageLabels[$modalityCode] = (string)$row['modalidad_nombre'];
             }
 
             if ($expanded === [] || count($expanded) > 1000) {
@@ -613,9 +853,11 @@ abstract class CuotasRegistros extends CuotasConsultas
             $auditTable = count($types) === 1 && reset($expanded)['tipo'] === 'INSCRIPCION'
                 ? 'pagos_inscripciones'
                 : 'pagos';
-            $packageText = $packageLabels === []
-                ? 'Se anularon las líneas seleccionadas del registro.'
-                : 'Se anuló el paquete completo de ' . implode(' / ', array_values($packageLabels)) . '.';
+            $packageText = $combinedOperation
+                ? 'Se anuló el cobro completo de cuotas e inscripción.'
+                : ($packageLabels === []
+                    ? 'Se anularon las líneas seleccionadas del registro.'
+                    : 'Se anuló el paquete completo de ' . implode(' / ', array_values($packageLabels)) . '.');
             audit_change(
                 $db,
                 $auth,
@@ -634,6 +876,7 @@ abstract class CuotasRegistros extends CuotasConsultas
             return [
                 'registros_anulados' => $affected,
                 'modalidades_atomicas' => array_values($packageLabels),
+                'cobro_atomico' => $combinedOperation,
             ];
         });
 
