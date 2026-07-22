@@ -9,7 +9,10 @@ import {
   faUser,
   faWallet,
 } from "@fortawesome/free-solid-svg-icons";
-import { ModulePage } from "../../Global/components/ModulePage";
+import {
+  ModulePage,
+  useCompactModuleActions,
+} from "../../Global/components/ModulePage";
 import CrudModal from "../../Global/components/CrudModal";
 import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../../Global/components/ModuleFeedback";
@@ -127,6 +130,7 @@ const emptyPaymentForm = () => ({
 
 export default function Cuotas() {
   const writable = canWrite();
+  const compactActions = useCompactModuleActions();
   const [tab, setTab] = useState("deudores");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -785,7 +789,7 @@ export default function Cuotas() {
       ? [
           {
             key: "modalidad",
-            label: "Concepto / modalidad",
+            label: "Modalidad",
             type: "select",
             className: "cuotas-modality-filter",
             placeholder: "Todos",
@@ -808,7 +812,7 @@ export default function Cuotas() {
       : []),
     {
       key: "anio",
-      label: "Año aplicado",
+      label: "Año",
       type: "select",
       className: "cuotas-year-filter",
       includeEmptyOption: false,
@@ -824,7 +828,7 @@ export default function Cuotas() {
       : [
           {
             key: "mes",
-            label: "Mes aplicado",
+            label: "Mes",
             type: "select",
             className: "cuotas-month-filter",
             includeEmptyOption: false,
@@ -848,15 +852,18 @@ export default function Cuotas() {
       className:
         "mov-btn--ghost cuotas-header-output-action cuotas-header-output-action--print",
     },
-    {
-      key: "excel",
-      label: "Excel",
-      icon: faFileExcel,
-      onClick: exportTable,
-      disabled: !items.length,
-      className:
-        "mov-btn--ghost cuotas-header-output-action cuotas-header-output-action--excel",
-    },
+    ...(!compactActions
+      ? [
+          {
+            key: "excel",
+            label: "Excel",
+            icon: faFileExcel,
+            onClick: exportTable,
+            disabled: !items.length,
+            className: "mov-btn--excel",
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -943,7 +950,9 @@ export default function Cuotas() {
                       {item.familia || "SIN FAMILIA"}
                     </span>
                   </div>
-                  <div className="mov-gridCell is-strong">{item.categoria}</div>
+                  <div className="mov-gridCell is-strong is-center">
+                    {item.categoria}
+                  </div>
                   <div className="mov-gridCell">
                     {item.primer_periodo?.label}
                   </div>
@@ -964,7 +973,7 @@ export default function Cuotas() {
                   <div className="mov-gridCell mov-gridCell--actions">
                     {writable ? (
                       <button
-                        className="mov-btn mov-btn--primary cuotas-pay-button"
+                        className="mov-iconBtn cuotas-pay-button"
                         type="button"
                         onClick={() =>
                           openPayment(
@@ -1117,15 +1126,17 @@ export default function Cuotas() {
             <FontAwesomeIcon icon={faPrint} />
             Imprimir
           </button>
-          <button
-            className="mov-btn cuotas-output-button"
-            type="button"
-            onClick={exportTable}
-            disabled={!items.length}
-          >
-            <FontAwesomeIcon icon={faFileExcel} />
-            Excel
-          </button>
+          {compactActions ? (
+            <button
+              className="mov-btn mov-btn--excel mov-btn--compact"
+              type="button"
+              onClick={exportTable}
+              disabled={!items.length}
+            >
+              <FontAwesomeIcon icon={faFileExcel} />
+              Excel
+            </button>
+          ) : null}
         </div>
       </ModulePage>
 

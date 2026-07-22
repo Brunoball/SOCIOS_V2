@@ -7,6 +7,35 @@ import {
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
 
+export function useCompactModuleActions(maxWidth = 1499) {
+  const getMatches = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia(`(max-width: ${maxWidth}px)`).matches;
+  const [compact, setCompact] = React.useState(getMatches);
+
+  React.useEffect(() => {
+    const mediaQuery = window.matchMedia(`(max-width: ${maxWidth}px)`);
+    const update = (event) => setCompact(event.matches);
+
+    setCompact(mediaQuery.matches);
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", update);
+    } else {
+      mediaQuery.addListener(update);
+    }
+
+    return () => {
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener("change", update);
+      } else {
+        mediaQuery.removeListener(update);
+      }
+    };
+  }, [maxWidth]);
+
+  return compact;
+}
+
 function filterOptionValue(option) {
   return typeof option === "object" ? option.value : option;
 }

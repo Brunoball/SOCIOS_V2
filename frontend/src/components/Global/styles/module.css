@@ -227,6 +227,54 @@
   background: color-mix(in srgb, var(--balto-bg) 65%, #fff);
 }
 
+.mov-btn.mov-btn--excel {
+  height: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-color: color-mix(in srgb, #218653 42%, var(--mov-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, #218653 10%, #fff);
+  box-shadow: none;
+  color: #187345;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.mov-btn.mov-btn--excel:hover:not(:disabled) {
+  border-color: color-mix(in srgb, #218653 62%, var(--mov-border));
+  background: color-mix(in srgb, #218653 17%, #fff);
+  box-shadow: 0 5px 12px color-mix(in srgb, #218653 18%, transparent);
+  color: #126039;
+  transform: translateY(-1px);
+}
+
+.mov-btn.mov-btn--excel svg {
+  font-size: 13px;
+}
+
+.mov-btn.mov-btn--excel.mov-btn--compact {
+  height: 30px;
+  min-height: 30px;
+  padding: 0 9px;
+  border-color: transparent;
+  border-radius: 8px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.mov-btn.mov-btn--excel.mov-btn--compact:hover:not(:disabled) {
+  border-color: color-mix(in srgb, #218653 20%, transparent);
+  background: color-mix(in srgb, #218653 8%, transparent);
+  box-shadow: none;
+  transform: none;
+}
+
+.mov-btn.mov-btn--excel.mov-btn--compact svg {
+  font-size: 12px;
+}
+
 .mov-btn--primary {
   background: var(--balto-action);
   border-color: color-mix(in srgb, var(--balto-action) 60%, #fff);

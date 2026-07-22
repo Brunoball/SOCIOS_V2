@@ -4,7 +4,10 @@ import {
   faArrowTrendDown,
   faArrowTrendUp,
   faCalendarDays,
+  faCircleCheck,
   faRotateRight,
+  faTags,
+  faTriangleExclamation,
   faUsers,
   faWallet,
 } from "@fortawesome/free-solid-svg-icons";
@@ -39,6 +42,29 @@ function MetricCard({ icon, title, value, tone = "default" }) {
         <span>{title}</span>
         <strong>{value}</strong>
       </div>
+    </article>
+  );
+}
+
+function ProgressItem({ icon, label, value, detail }) {
+  const normalized = Math.max(0, Math.min(100, Number(value || 0)));
+
+  return (
+    <article className="admin-dashboard__progressItem">
+      <div className="admin-dashboard__progressHead">
+        <span>
+          <FontAwesomeIcon icon={icon} />
+          {label}
+        </span>
+        <strong>{normalized}%</strong>
+      </div>
+      <div
+        className="admin-dashboard__progressTrack"
+        aria-label={`${label}: ${normalized}%`}
+      >
+        <i style={{ width: `${normalized}%` }} />
+      </div>
+      <small>{detail}</small>
     </article>
   );
 }
@@ -127,8 +153,33 @@ export default function Dashboard() {
     return () => controller.abort();
   }, [reloadKey]);
 
-  const { socios, contable, periodo } = summary;
+  const { socios, contable, estado, periodo } = summary;
   const balance = Number(contable.saldo_mes || 0);
+  const complete = Boolean(estado.configuracion_completa);
+  const pendingConfig = estado.configuracion_pendientes || [];
+
+  const statusItems = [
+    {
+      icon: faUsers,
+      label: "Socios con familia",
+      value: estado.socios_con_familia,
+      detail: `${Number(socios.con_familia || 0)} de ${Number(socios.activos || 0)} socios activos`,
+    },
+    {
+      icon: faTags,
+      label: "Socios con categoría",
+      value: estado.socios_con_categoria,
+      detail: `${Number(socios.con_categoria || 0)} socios con al menos una categoría activa`,
+    },
+    {
+      icon: complete ? faCircleCheck : faTriangleExclamation,
+      label: "Configuración contable",
+      value: estado.configuracion_contable,
+      detail: complete
+        ? "Listas y medios de pago listos para operar"
+        : `${pendingConfig.length} lista${pendingConfig.length === 1 ? "" : "s"} pendiente${pendingConfig.length === 1 ? "" : "s"}`,
+    },
+  ];
 
   return (
     <section className="admin-dashboard">
@@ -185,23 +236,47 @@ export default function Dashboard() {
           />
         </section>
 
-        <article className="admin-dashboard__panel admin-dashboard__panel--chart">
-          <header className="admin-dashboard__panelHead">
-            <div>
-              <h2>Movimiento contable</h2>
-              <p>Ingresos y egresos de los últimos seis meses.</p>
-            </div>
-            <div className="admin-dashboard__legend">
-              <span>
-                <i className="is-income" /> Ingresos
+        <div className="admin-dashboard__mainGrid">
+          <article className="admin-dashboard__panel admin-dashboard__panel--chart">
+            <header className="admin-dashboard__panelHead">
+              <div>
+                <h2>Movimiento contable</h2>
+                <p>Ingresos y egresos de los últimos seis meses.</p>
+              </div>
+              <div className="admin-dashboard__legend">
+                <span>
+                  <i className="is-income" /> Ingresos
+                </span>
+                <span>
+                  <i className="is-expense" /> Egresos
+                </span>
+              </div>
+            </header>
+            <Chart items={summary.serie || []} />
+          </article>
+
+          <aside className="admin-dashboard__panel admin-dashboard__panel--status">
+            <header className="admin-dashboard__panelHead admin-dashboard__panelHead--status">
+              <div>
+                <h2>Estado de la administración</h2>
+                <p>Controles rápidos sobre la información principal.</p>
+              </div>
+              <span
+                className={`admin-dashboard__statusChip ${complete ? "is-complete" : "is-pending"}`}
+              >
+                <FontAwesomeIcon
+                  icon={complete ? faCircleCheck : faTriangleExclamation}
+                />
+                {complete ? "Contable listo" : "Configuración pendiente"}
               </span>
-              <span>
-                <i className="is-expense" /> Egresos
-              </span>
+            </header>
+            <div className="admin-dashboard__progressList">
+              {statusItems.map((item) => (
+                <ProgressItem key={item.label} {...item} />
+              ))}
             </div>
-          </header>
-          <Chart items={summary.serie || []} />
-        </article>
+          </aside>
+        </div>
       </div>
     </section>
   );

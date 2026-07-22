@@ -65,30 +65,32 @@ export default function CrudModal({
         </header>
         <form onSubmit={onSubmit}>
           <div className="entity-modal__body">{children}</div>
-          <footer className="entity-modal__footer">
-            {footerStart ? (
-              <div className="entity-modal__footer-start">{footerStart}</div>
-            ) : null}
-            {!hideCancel ? (
-              <button
-                className="mov-btn mov-btn--ghost"
-                type="button"
-                onClick={onClose}
-                disabled={saving}
-              >
-                {cancelLabel}
-              </button>
-            ) : null}
-            {!hideSubmit ? (
-              <button
-                className={`mov-btn ${danger ? "mov-btn--danger" : "mov-btn--primary"}`}
-                type="submit"
-                disabled={saving || submitDisabled}
-              >
-                {saving ? "Guardando..." : submitLabel}
-              </button>
-            ) : null}
-          </footer>
+          {footerStart || !hideCancel || !hideSubmit ? (
+            <footer className="entity-modal__footer">
+              {footerStart ? (
+                <div className="entity-modal__footer-start">{footerStart}</div>
+              ) : null}
+              {!hideCancel ? (
+                <button
+                  className="mov-btn mov-btn--ghost"
+                  type="button"
+                  onClick={onClose}
+                  disabled={saving}
+                >
+                  {cancelLabel}
+                </button>
+              ) : null}
+              {!hideSubmit ? (
+                <button
+                  className={`mov-btn ${danger ? "mov-btn--danger" : "mov-btn--primary"}`}
+                  type="submit"
+                  disabled={saving || submitDisabled}
+                >
+                  {saving ? "Guardando..." : submitLabel}
+                </button>
+              ) : null}
+            </footer>
+          ) : null}
         </form>
       </div>
     </div>,

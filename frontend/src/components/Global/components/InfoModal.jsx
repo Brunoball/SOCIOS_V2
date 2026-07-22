@@ -26,7 +26,7 @@ export default function InfoModal({
       subtitle={subtitle}
       onClose={onClose}
       hideSubmit
-      cancelLabel="Cerrar"
+      hideCancel
       wide
       modalClassName={`entity-info-modal ${modalClassName}`.trim()}
     >

@@ -142,6 +142,7 @@
 }
 
 .admin-dashboard__metric {
+  --metric-tone: var(--dashboard-action);
   position: relative;
   min-width: 0;
   min-height: 82px;
@@ -150,11 +151,29 @@
   gap: 11px;
   overflow: hidden;
   padding: 12px 14px;
-  border: 1px solid var(--dashboard-border);
+  border: 1px solid
+    color-mix(in srgb, var(--metric-tone) 24%, var(--dashboard-border));
   border-radius: var(--blue-inst-radius-lg);
-  color: var(--dashboard-action);
-  background: var(--dashboard-surface);
-  box-shadow: var(--mov-shadow-sm);
+  color: var(--metric-tone);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--metric-tone) 14%, var(--dashboard-surface)) 0%,
+    var(--dashboard-surface) 72%
+  );
+  box-shadow:
+    0 8px 20px color-mix(in srgb, var(--metric-tone) 12%, transparent),
+    var(--mov-shadow-sm);
+}
+
+.admin-dashboard__metric::before {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 4px;
+  border-radius: 0 999px 999px 0;
+  background: var(--metric-tone);
+  content: "";
 }
 
 .admin-dashboard__metric::after {
@@ -165,18 +184,18 @@
   height: 72px;
   border-radius: 50%;
   background: currentColor;
-  opacity: 0.06;
+  opacity: 0.1;
   content: "";
 }
 
 .admin-dashboard__metric.is-income,
 .admin-dashboard__metric.is-balance {
-  color: var(--dashboard-success);
+  --metric-tone: var(--dashboard-success);
 }
 
 .admin-dashboard__metric.is-expense,
 .admin-dashboard__metric.is-danger {
-  color: var(--dashboard-danger);
+  --metric-tone: var(--dashboard-danger);
 }
 
 .admin-dashboard__metricIcon {
@@ -187,8 +206,10 @@
   place-items: center;
   border-radius: var(--blue-inst-radius);
   color: currentColor;
-  background: color-mix(in srgb, currentColor 9%, var(--dashboard-surface));
-  font-size: 15px;
+  border: 1px solid color-mix(in srgb, currentColor 28%, transparent);
+  background: color-mix(in srgb, currentColor 17%, var(--dashboard-surface));
+  box-shadow: 0 5px 12px color-mix(in srgb, currentColor 15%, transparent);
+  font-size: 16px;
 }
 
 .admin-dashboard__metricBody {
@@ -200,7 +221,7 @@
 
 .admin-dashboard__metricBody span {
   overflow: hidden;
-  color: var(--dashboard-muted);
+  color: color-mix(in srgb, var(--metric-tone) 74%, var(--dashboard-text));
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -220,6 +241,14 @@
   white-space: nowrap;
 }
 
+.admin-dashboard__mainGrid {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(300px, 0.82fr);
+  gap: 12px;
+}
+
 .admin-dashboard__panel {
   min-width: 0;
   min-height: 0;
@@ -230,6 +259,13 @@
 }
 
 .admin-dashboard__panel--chart {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.admin-dashboard__panel--status {
   min-height: 300px;
   display: flex;
   flex-direction: column;
@@ -373,7 +409,125 @@
   font-size: 9px;
 }
 
-@media (max-width: 980px) {
+.admin-dashboard__panelHead--status {
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-dashboard__statusChip {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.admin-dashboard__statusChip.is-complete {
+  color: var(--dashboard-success);
+  border: 1px solid
+    color-mix(in srgb, var(--dashboard-success) 24%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--dashboard-success) 8%,
+    var(--dashboard-surface)
+  );
+}
+
+.admin-dashboard__statusChip.is-pending {
+  color: var(--dashboard-action);
+  border: 1px solid color-mix(in srgb, var(--dashboard-action) 25%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--dashboard-action) 8%,
+    var(--dashboard-surface)
+  );
+}
+
+.admin-dashboard__progressList {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.admin-dashboard__progressItem {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  justify-content: center;
+  padding: 10px 11px;
+  border: 1px solid var(--dashboard-border);
+  border-radius: var(--blue-inst-radius);
+  background: var(--dashboard-surface);
+}
+
+.admin-dashboard__progressHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.admin-dashboard__progressHead span {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  color: var(--dashboard-text);
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-dashboard__progressHead span svg {
+  flex: 0 0 auto;
+  color: var(--dashboard-action);
+}
+
+.admin-dashboard__progressHead strong {
+  flex: 0 0 auto;
+  color: var(--dashboard-ink);
+  font-size: 12px;
+}
+
+.admin-dashboard__progressTrack {
+  height: 7px;
+  margin: 8px 0 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--dashboard-ink) 8%, transparent);
+}
+
+.admin-dashboard__progressTrack i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--dashboard-action) 60%, var(--dashboard-surface)),
+    var(--dashboard-action)
+  );
+}
+
+.admin-dashboard__progressItem small {
+  display: block;
+  overflow: hidden;
+  color: var(--dashboard-muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
   .admin-dashboard {
     height: auto;
     min-height: 100%;
@@ -384,8 +538,27 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .admin-dashboard__body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .admin-dashboard__mainGrid {
+    grid-template-columns: 1fr;
+  }
+
   .admin-dashboard__panel--chart {
     min-height: 390px;
+  }
+
+  .admin-dashboard__panel--status {
+    min-height: auto;
+  }
+
+  .admin-dashboard__progressList {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: visible;
   }
 }
 
@@ -406,6 +579,10 @@
   }
 
   .admin-dashboard__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-dashboard__progressList {
     grid-template-columns: 1fr;
   }
 
@@ -452,6 +629,11 @@
   }
 
   .admin-dashboard__panel--chart {
+    min-height: 250px;
+    padding: 13px 15px;
+  }
+
+  .admin-dashboard__panel--status {
     min-height: 250px;
     padding: 13px 15px;
   }

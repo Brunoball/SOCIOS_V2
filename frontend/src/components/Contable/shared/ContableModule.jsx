@@ -18,7 +18,10 @@ import {
   faPlus,
   faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
-import { ModulePage } from "../../Global/components/ModulePage";
+import {
+  ModulePage,
+  useCompactModuleActions,
+} from "../../Global/components/ModulePage";
 import GlobalDivTable from "../../Global/components/GlobalDivTable";
 import CrudModal from "../../Global/components/CrudModal";
 import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
@@ -334,6 +337,7 @@ function Breakdown({ title, items = [] }) {
 }
 
 export default function ContableModule({ view = "summary" }) {
+  const compactActions = useCompactModuleActions();
   const writable = canWrite();
 
   const [catalogs, setCatalogs] = useState(emptyCatalogs);
@@ -851,16 +855,16 @@ export default function ContableModule({ view = "summary" }) {
         canCreate={canCreateMovement}
         primaryActionClassName={canCreateMovement ? "contable-create-top" : ""}
         secondaryActions={
-          view === "summary"
+          view === "summary" || compactActions
             ? []
             : [
                 {
                   key: "excel",
-                  label: "Exportar Excel",
+                  label: "Excel",
                   icon: faFileExcel,
                   onClick: exportCurrent,
                   disabled: !data.items?.length,
-                  className: "mov-btn--ghost contable-export-top",
+                  className: "mov-btn--excel contable-export-top",
                 },
               ]
         }
@@ -1091,15 +1095,17 @@ export default function ContableModule({ view = "summary" }) {
               <div
                 className={`contable-lower-actions ${view === "expense" || (view === "income" && incomeTab === "manual") ? "contable-lower-actions--right" : ""}`.trim()}
               >
-                <button
-                  type="button"
-                  className="mov-btn mov-btn--ghost"
-                  onClick={exportCurrent}
-                  disabled={!data.items?.length}
-                >
-                  <FontAwesomeIcon icon={faFileExcel} />
-                  Exportar Excel
-                </button>
+                {compactActions ? (
+                  <button
+                    type="button"
+                    className="mov-btn mov-btn--excel mov-btn--compact"
+                    onClick={exportCurrent}
+                    disabled={!data.items?.length}
+                  >
+                    <FontAwesomeIcon icon={faFileExcel} />
+                    Excel
+                  </button>
+                ) : null}
                 {canCreateMovement ? (
                   <button
                     type="button"
