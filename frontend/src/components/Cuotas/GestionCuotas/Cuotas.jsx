@@ -29,6 +29,16 @@ const today = () => {
     .toISOString()
     .slice(0, 10);
 };
+const openDatePicker = (event) => {
+  const input = event.currentTarget;
+  if (typeof input.showPicker !== "function") return;
+
+  try {
+    input.showPicker();
+  } catch {
+    // El navegador mantiene el comportamiento nativo si no permite abrirlo.
+  }
+};
 const currentDate = new Date();
 const currentYear = currentDate.getFullYear();
 const currentMonth = currentDate.getMonth() + 1;
@@ -1478,6 +1488,7 @@ export default function Cuotas() {
                       type="date"
                       max={today()}
                       value={paymentForm.fecha_pago}
+                      onClick={openDatePicker}
                       onChange={(event) =>
                         updateForm("fecha_pago", event.target.value)
                       }

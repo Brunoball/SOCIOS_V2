@@ -41,6 +41,17 @@ const dateToday = () => {
     .slice(0, 10);
 };
 
+const openDatePicker = (event) => {
+  const input = event.currentTarget;
+  if (typeof input.showPicker !== "function") return;
+
+  try {
+    input.showPicker();
+  } catch {
+    // El navegador mantiene el comportamiento nativo si no permite abrirlo.
+  }
+};
+
 const upper = (value) => value.toLocaleUpperCase("es-AR");
 const CATEGORY_TAB_GENERAL = "general";
 const CATEGORY_TAB_PRICE = "price";
@@ -164,6 +175,7 @@ function CategoryForm({ form, setForm, activeTab, onTabChange }) {
               type="date"
               value={form.vigente_desde}
               max={dateToday()}
+              onClick={openDatePicker}
               onChange={(event) => update("vigente_desde", event.target.value)}
               required
             />
