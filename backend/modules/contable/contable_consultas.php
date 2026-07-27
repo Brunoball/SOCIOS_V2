@@ -435,7 +435,7 @@ trait ContableConsultas
         }
 
         $extra = $isIncome
-            ? ''
+            ? ', m.origen_modulo, m.id_referencia_origen'
             : ', m.numero_comprobante, m.archivo_nombre_original, m.archivo_mime, m.archivo_tamanio, (m.archivo_path IS NOT NULL) AS tiene_archivo';
         $statement = $db->prepare(
             "SELECT m.{$idField}, m.fecha, m.id_medio_pago, m.id_proveedor, m.id_categoria, m.id_concepto,
@@ -460,6 +460,11 @@ trait ContableConsultas
             if (!$isIncome) {
                 $item['tiene_archivo'] = (bool)$item['tiene_archivo'];
                 $item['archivo_tamanio'] = $item['archivo_tamanio'] === null ? null : (int)$item['archivo_tamanio'];
+            } else {
+                $item['origen_modulo'] = (string)($item['origen_modulo'] ?? 'MANUAL');
+                $item['id_referencia_origen'] = $item['id_referencia_origen'] === null
+                    ? null
+                    : (int)$item['id_referencia_origen'];
             }
             $total += $itemCents;
             $category = (string)$item['categoria'];

@@ -53,6 +53,13 @@ trait ContableGestion
                 $statement->execute([$id]);
                 $before = $statement->fetch();
                 if (!$before) api_error('El ingreso que intentás editar no existe.', 'INGRESO_NO_ENCONTRADO', 404);
+                if ((string)($before['origen_modulo'] ?? 'MANUAL') !== 'MANUAL') {
+                    api_error(
+                        'Este ingreso fue generado automáticamente. Modificalo desde el módulo que lo originó.',
+                        'INGRESO_AUTOMATICO_PROTEGIDO',
+                        409
+                    );
+                }
                 $db->prepare(
                     'UPDATE contable_ingresos SET fecha = ?, id_medio_pago = ?, id_proveedor = ?, id_categoria = ?, id_concepto = ?,
                      importe = ?, detalle = ?, medio_pago_snapshot = ?, proveedor_snapshot = ?, categoria_snapshot = ?, concepto_snapshot = ?,
@@ -96,6 +103,13 @@ trait ContableGestion
             $statement->execute([$id]);
             $before = $statement->fetch();
             if (!$before) api_error('El ingreso no existe o ya fue anulado.', 'INGRESO_NO_ENCONTRADO', 404);
+            if ((string)($before['origen_modulo'] ?? 'MANUAL') !== 'MANUAL') {
+                api_error(
+                    'Este ingreso fue generado automáticamente. Anulalo desde el módulo que lo originó.',
+                    'INGRESO_AUTOMATICO_PROTEGIDO',
+                    409
+                );
+            }
             $db->prepare("UPDATE contable_ingresos SET estado = 'ANULADO', fecha_anulacion = NOW(), id_usuario_master_modificacion = ? WHERE id_ingreso = ?")
                 ->execute([$auth['id_usuario_master'], $id]);
             audit_change($db, $auth, 'CONTABLE', 'ANULAR_INGRESO', 'contable_ingresos', $id, 'Se anuló un ingreso manual.', $before, ['estado' => 'ANULADO']);

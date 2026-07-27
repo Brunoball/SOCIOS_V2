@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faBars,
+  faCashRegister,
   faChartLine,
   faGear,
   faReceipt,
@@ -15,7 +16,11 @@ import {
   faWallet,
   faXmark,
 } from "@fortawesome/free-solid-svg-icons";
-import { clearSession, getSession, openAuthenticatedTab } from "../Global/auth/session";
+import {
+  clearSession,
+  getSession,
+  openAuthenticatedTab,
+} from "../Global/auth/session";
 import { apiPost } from "../Global/api/apiClient";
 import { BOT_PANEL_ROUTE } from "../../config/config";
 import "./AppLayout.css";
@@ -23,7 +28,12 @@ import "./AppLayout.css";
 const APP_NAME = "Gestión de Socios";
 
 const NAV_ITEMS = [
-  { key: "administracion", label: "Administración", path: "/panel", icon: faChartLine },
+  {
+    key: "administracion",
+    label: "Administración",
+    path: "/panel",
+    icon: faChartLine,
+  },
   {
     key: "socios",
     label: "Socios",
@@ -36,6 +46,7 @@ const NAV_ITEMS = [
     ],
   },
   { key: "cuotas", label: "Cuotas", path: "/cuotas", icon: faReceipt },
+  { key: "ventas", label: "Ventas", path: "/ventas", icon: faCashRegister },
   {
     key: "categorias",
     label: "Categorías",
@@ -44,7 +55,11 @@ const NAV_ITEMS = [
     icon: faTags,
     children: [
       { key: "categorias-listado", label: "Categorías", path: "/categorias" },
-      { key: "categorias-descuentos", label: "Descuentos familiares", path: "/categorias/descuentos" },
+      {
+        key: "categorias-descuentos",
+        label: "Descuentos familiares",
+        path: "/categorias/descuentos",
+      },
     ],
   },
   {
@@ -54,7 +69,11 @@ const NAV_ITEMS = [
     defaultPath: "/contable/ingresos",
     icon: faWallet,
     children: [
-      { key: "contable-ingresos", label: "Ingresos", path: "/contable/ingresos" },
+      {
+        key: "contable-ingresos",
+        label: "Ingresos",
+        path: "/contable/ingresos",
+      },
       { key: "contable-egresos", label: "Egresos", path: "/contable/egresos" },
       { key: "contable-resumen", label: "Resumen", path: "/contable/resumen" },
     ],
@@ -70,12 +89,12 @@ const NAV_ITEMS = [
 
 const GROUP_CLICK_DELAY = 0;
 
-const getGroupKeyForPath = (pathname) => (
+const getGroupKeyForPath = (pathname) =>
   NAV_ITEMS.find(
-    (item) => item.children
-      && (pathname === item.path || pathname.startsWith(`${item.path}/`))
-  )?.key || null
-);
+    (item) =>
+      item.children &&
+      (pathname === item.path || pathname.startsWith(`${item.path}/`)),
+  )?.key || null;
 
 function LogoutModal({ open, onClose, onConfirm }) {
   useEffect(() => {
@@ -86,18 +105,42 @@ function LogoutModal({ open, onClose, onConfirm }) {
   }, [open, onClose]);
   if (!open) return null;
   return createPortal(
-    <div className="pp-modal-overlay" role="dialog" aria-modal="true" onMouseDown={onClose}>
-      <div className="pp-modal" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="pp-modal__icon"><FontAwesomeIcon icon={faRightFromBracket} /></div>
+    <div
+      className="pp-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={onClose}
+    >
+      <div
+        className="pp-modal"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="pp-modal__icon">
+          <FontAwesomeIcon icon={faRightFromBracket} />
+        </div>
         <h3 className="pp-modal__title">Confirmar cierre de sesión</h3>
-        <p className="pp-modal__text">¿Estás seguro de que deseas salir del sistema?</p>
+        <p className="pp-modal__text">
+          ¿Estás seguro de que deseas salir del sistema?
+        </p>
         <div className="pp-modal__actions">
-          <button className="pp-btn pp-btn--ghost" type="button" onClick={onClose}>Cancelar</button>
-          <button className="pp-btn pp-btn--danger" type="button" onClick={onConfirm}>Cerrar sesión</button>
+          <button
+            className="pp-btn pp-btn--ghost"
+            type="button"
+            onClick={onClose}
+          >
+            Cancelar
+          </button>
+          <button
+            className="pp-btn pp-btn--danger"
+            type="button"
+            onClick={onConfirm}
+          >
+            Cerrar sesión
+          </button>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
 
@@ -107,7 +150,9 @@ export default function AppLayout() {
   const session = getSession();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
-  const [openGroupKey, setOpenGroupKey] = useState(() => getGroupKeyForPath(location.pathname));
+  const [openGroupKey, setOpenGroupKey] = useState(() =>
+    getGroupKeyForPath(location.pathname),
+  );
   const groupClickTimer = useRef(null);
 
   useEffect(() => {
@@ -115,9 +160,12 @@ export default function AppLayout() {
     setOpenGroupKey(getGroupKeyForPath(location.pathname));
   }, [location.pathname]);
 
-  useEffect(() => () => {
-    if (groupClickTimer.current) clearTimeout(groupClickTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (groupClickTimer.current) clearTimeout(groupClickTimer.current);
+    },
+    [],
+  );
 
   const activeLabel = useMemo(() => {
     const configurationLabels = {
@@ -132,9 +180,15 @@ export default function AppLayout() {
     }
     if (location.pathname.startsWith("/configuracion")) return "Configuración";
     for (const item of NAV_ITEMS) {
-      const child = item.children?.find((entry) => location.pathname === entry.path);
+      const child = item.children?.find(
+        (entry) => location.pathname === entry.path,
+      );
       if (child) return child.label;
-      if (location.pathname === item.path || location.pathname.startsWith(`${item.path}/`)) return item.label;
+      if (
+        location.pathname === item.path ||
+        location.pathname.startsWith(`${item.path}/`)
+      )
+        return item.label;
     }
     return "Administración";
   }, [location.pathname]);
@@ -164,7 +218,9 @@ export default function AppLayout() {
     if (event.detail > 1) return;
 
     groupClickTimer.current = setTimeout(() => {
-      setOpenGroupKey((currentKey) => (currentKey === item.key ? null : item.key));
+      setOpenGroupKey((currentKey) =>
+        currentKey === item.key ? null : item.key,
+      );
       groupClickTimer.current = null;
     }, GROUP_CLICK_DELAY);
   };
@@ -186,9 +242,18 @@ export default function AppLayout() {
     <div className="pp-shell">
       <header className="mov-topbar">
         <div className="mov-topbar__left">
-          <button className="pp-burger" type="button" onClick={() => setDrawerOpen(true)} aria-label="Abrir menú"><FontAwesomeIcon icon={faBars} /></button>
+          <button
+            className="pp-burger"
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            aria-label="Abrir menú"
+          >
+            <FontAwesomeIcon icon={faBars} />
+          </button>
           <div className="mov-topbar__logo mov-topbar__appBrand">
-            <span className="mov-topbar__appBrandMark"><FontAwesomeIcon icon={faUsers} /></span>
+            <span className="mov-topbar__appBrandMark">
+              <FontAwesomeIcon icon={faUsers} />
+            </span>
             <span>{APP_NAME}</span>
           </div>
         </div>
@@ -203,32 +268,81 @@ export default function AppLayout() {
           >
             <FontAwesomeIcon icon={faGear} />
           </button>
-          <button className="mov-topbar__usericon" type="button" title={`${session?.usuario?.nombre || "Usuario"} · ${session?.usuario?.rol || ""}`}><FontAwesomeIcon icon={faUserCircle} /></button>
-          <button className="pp-topbarLogout" type="button" onClick={() => setLogoutOpen(true)} title="Cerrar sesión"><FontAwesomeIcon icon={faRightFromBracket} /></button>
+          <button
+            className="mov-topbar__usericon"
+            type="button"
+            title={`${session?.usuario?.nombre || "Usuario"} · ${session?.usuario?.rol || ""}`}
+          >
+            <FontAwesomeIcon icon={faUserCircle} />
+          </button>
+          <button
+            className="pp-topbarLogout"
+            type="button"
+            onClick={() => setLogoutOpen(true)}
+            title="Cerrar sesión"
+          >
+            <FontAwesomeIcon icon={faRightFromBracket} />
+          </button>
         </div>
       </header>
 
-      <div className={`pp-drawerOverlay ${drawerOpen ? "is-open" : ""}`} onMouseDown={() => setDrawerOpen(false)} />
+      <div
+        className={`pp-drawerOverlay ${drawerOpen ? "is-open" : ""}`}
+        onMouseDown={() => setDrawerOpen(false)}
+      />
       <aside className={`pp-sidebar ${drawerOpen ? "is-drawerOpen" : ""}`}>
         <div className="pp-drawerHeader">
-          <div className="pp-drawerBrand" onClick={() => navigate("/panel")} role="button" tabIndex={0}>
-            <div className="pp-drawerBrand__mark"><FontAwesomeIcon icon={faChartLine} /></div>
-            <div className="pp-drawerBrand__txt"><div className="pp-drawerBrand__t">{APP_NAME}</div><div className="pp-drawerBrand__s">Administración</div></div>
+          <div
+            className="pp-drawerBrand"
+            onClick={() => navigate("/panel")}
+            role="button"
+            tabIndex={0}
+          >
+            <div className="pp-drawerBrand__mark">
+              <FontAwesomeIcon icon={faChartLine} />
+            </div>
+            <div className="pp-drawerBrand__txt">
+              <div className="pp-drawerBrand__t">{APP_NAME}</div>
+              <div className="pp-drawerBrand__s">Administración</div>
+            </div>
           </div>
-          <button className="pp-drawerClose" type="button" onClick={() => setDrawerOpen(false)}><FontAwesomeIcon icon={faXmark} /></button>
+          <button
+            className="pp-drawerClose"
+            type="button"
+            onClick={() => setDrawerOpen(false)}
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
         </div>
 
-        <div className="pp-brand panel_contable" onClick={() => navigate("/panel")} role="button" tabIndex={0}>
-          <div className="pp-brand__mark"><FontAwesomeIcon icon={faChartLine} /></div>
-          <div className="pp-brand__text"><div className="pp-brand__title">{APP_NAME}</div><div className="pp-brand__subtitle">Administración</div></div>
+        <div
+          className="pp-brand panel_contable"
+          onClick={() => navigate("/panel")}
+          role="button"
+          tabIndex={0}
+        >
+          <div className="pp-brand__mark">
+            <FontAwesomeIcon icon={faChartLine} />
+          </div>
+          <div className="pp-brand__text">
+            <div className="pp-brand__title">{APP_NAME}</div>
+            <div className="pp-brand__subtitle">Administración</div>
+          </div>
         </div>
 
         <nav className="pp-nav" aria-label="Navegación principal">
           {NAV_ITEMS.map((item) => {
-            const active = location.pathname === item.path || location.pathname.startsWith(`${item.path}/`);
-            const groupOpen = Boolean(item.children && openGroupKey === item.key);
+            const active =
+              location.pathname === item.path ||
+              location.pathname.startsWith(`${item.path}/`);
+            const groupOpen = Boolean(
+              item.children && openGroupKey === item.key,
+            );
             return (
-              <div className={`pp-navGroup ${item.children ? "has-sub" : ""} ${groupOpen ? "is-open" : ""}`} key={item.key}>
+              <div
+                className={`pp-navGroup ${item.children ? "has-sub" : ""} ${groupOpen ? "is-open" : ""}`}
+                key={item.key}
+              >
                 {item.external ? (
                   <button
                     className="pp-nav__item"
@@ -240,7 +354,10 @@ export default function AppLayout() {
                       openAuthenticatedTab(item.path);
                     }}
                   >
-                    <span className="pp-nav__icon"><FontAwesomeIcon icon={item.icon} /></span><span className="pp-nav__label">{item.label}</span>
+                    <span className="pp-nav__icon">
+                      <FontAwesomeIcon icon={item.icon} />
+                    </span>
+                    <span className="pp-nav__label">{item.label}</span>
                   </button>
                 ) : item.children ? (
                   <button
@@ -248,25 +365,43 @@ export default function AppLayout() {
                     type="button"
                     aria-expanded={groupOpen}
                     onClick={(event) => toggleGroup(item, event)}
-                    onDoubleClick={(event) => handleGroupDoubleClick(item, event)}
+                    onDoubleClick={(event) =>
+                      handleGroupDoubleClick(item, event)
+                    }
                     title="Un clic para desplegar; doble clic para ingresar"
                   >
-                    <span className="pp-nav__icon"><FontAwesomeIcon icon={item.icon} /></span><span className="pp-nav__label">{item.label}</span>
+                    <span className="pp-nav__icon">
+                      <FontAwesomeIcon icon={item.icon} />
+                    </span>
+                    <span className="pp-nav__label">{item.label}</span>
                   </button>
                 ) : (
                   <NavLink
-                    className={({ isActive }) => `pp-nav__item ${isActive ? "is-active" : ""}`}
+                    className={({ isActive }) =>
+                      `pp-nav__item ${isActive ? "is-active" : ""}`
+                    }
                     to={item.path}
                     onClick={closeOpenGroup}
                   >
-                    <span className="pp-nav__icon"><FontAwesomeIcon icon={item.icon} /></span><span className="pp-nav__label">{item.label}</span>
+                    <span className="pp-nav__icon">
+                      <FontAwesomeIcon icon={item.icon} />
+                    </span>
+                    <span className="pp-nav__label">{item.label}</span>
                   </NavLink>
                 )}
                 {item.children ? (
                   <div className="pp-navSub" aria-hidden={!groupOpen}>
                     {item.children.map((child) => (
-                      <NavLink end className={({ isActive }) => `pp-navSub__item ${isActive ? "is-active" : ""}`} to={child.path} key={child.key}>
-                        <span className="pp-navSub__dot" /><span className="pp-navSub__label">{child.label}</span>
+                      <NavLink
+                        end
+                        className={({ isActive }) =>
+                          `pp-navSub__item ${isActive ? "is-active" : ""}`
+                        }
+                        to={child.path}
+                        key={child.key}
+                      >
+                        <span className="pp-navSub__dot" />
+                        <span className="pp-navSub__label">{child.label}</span>
                       </NavLink>
                     ))}
                   </div>
@@ -277,8 +412,16 @@ export default function AppLayout() {
         </nav>
       </aside>
 
-      <main className="pp-content"><div className="pp-content__inner"><Outlet /></div></main>
-      <LogoutModal open={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={logout} />
+      <main className="pp-content">
+        <div className="pp-content__inner">
+          <Outlet />
+        </div>
+      </main>
+      <LogoutModal
+        open={logoutOpen}
+        onClose={() => setLogoutOpen(false)}
+        onConfirm={logout}
+      />
     </div>
   );
 }

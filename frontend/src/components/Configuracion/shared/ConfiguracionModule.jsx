@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowLeft,
@@ -23,6 +23,7 @@ import ModuleFeedback from "../../Global/components/ModuleFeedback";
 import { canWrite } from "../../Global/auth/session";
 import { configuracionApi } from "../api/configuracionApi";
 import { useConfiguracion } from "../hooks/useConfiguracion";
+import VentasConfiguracion from "../Ventas/VentasConfiguracion";
 import "./Configuracion.css";
 
 const upper = (value) => String(value ?? "").toLocaleUpperCase("es-AR");
@@ -276,6 +277,7 @@ function ConfigList({ items, listKey, emptyText, writable, onEdit, onState }) {
 
 export default function ConfiguracionModule({ group = null }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const writable = canWrite();
   const { parametros, listas, resumen, error, cargar } = useConfiguracion();
   const activeGroup = group;
@@ -317,6 +319,16 @@ export default function ConfiguracionModule({ group = null }) {
         id: "socios",
         ...CONFIG_GROUPS.socios,
         status: `${Number(locationsActive || 0)} ${Number(locationsActive || 0) === 1 ? "localidad" : "localidades"}`,
+      },
+      {
+        id: "ventas",
+        title: "Configuración de ventas",
+        description: "Administrá cajas, sedes, puntos o canales y su imputación contable.",
+        icon: faCashRegister,
+        area: "Ventas",
+        detail: "Cajas, canales e integración contable",
+        status: "Cajas y canales",
+        sections: [],
       },
       {
         id: "contable",
@@ -425,6 +437,9 @@ export default function ConfiguracionModule({ group = null }) {
     }]
     : [];
 
+  const salesSettingsOpen =
+    !activeGroup && new URLSearchParams(location.search).get("seccion") === "ventas";
+
   const feedbackNode = (
     <ModuleFeedback
       type={feedback?.type || "error"}
@@ -432,6 +447,10 @@ export default function ConfiguracionModule({ group = null }) {
       onClose={() => setFeedback(null)}
     />
   );
+
+  if (salesSettingsOpen && !activeGroup) {
+    return <VentasConfiguracion onBack={() => navigate("/configuracion")} />;
+  }
 
   if (!activeGroup) {
     return (
@@ -456,7 +475,13 @@ export default function ConfiguracionModule({ group = null }) {
             <ConfigAccessCard
               key={card.id}
               {...card}
-              onClick={() => navigate(`/configuracion/${card.id}`)}
+              onClick={() => {
+                if (card.id === "ventas") {
+                  navigate("/configuracion?seccion=ventas");
+                  return;
+                }
+                navigate(`/configuracion/${card.id}`);
+              }}
             />
           ))}
         </div>

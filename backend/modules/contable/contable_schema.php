@@ -47,5 +47,19 @@ function ensure_contable_schema(PDO $db): void
         );
     }
 
+    $statement = $db->query(
+        "SELECT COLUMN_NAME
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'contable_ingresos'
+           AND COLUMN_NAME IN ('origen_modulo', 'id_referencia_origen')"
+    );
+    $originColumns = $statement->fetchAll(PDO::FETCH_COLUMN);
+    if (count($originColumns) !== 2) {
+        throw new RuntimeException(
+            'Falta aplicar la migración de Ventas que integra sus ingresos con el módulo Contable.'
+        );
+    }
+
     $validatedConnections[$connectionId] = true;
 }

@@ -959,32 +959,46 @@ export default function ContableModule({ view = "summary" }) {
                       <div className="mov-gridCell entity-main-cell">
                         <strong>{item.concepto}</strong>
                         {item.detalle ? <small>{item.detalle}</small> : null}
+                        {item.origen_modulo === "VENTAS" ? (
+                          <small className="contable-originTag">
+                            GENERADO POR VENTAS · #{item.id_referencia_origen}
+                          </small>
+                        ) : null}
                       </div>
                       <div className="mov-gridCell is-center is-strong">
                         {money(item.importe)}
                       </div>
                       {writable ? (
                         <div className="mov-gridCell mov-gridCell--actions">
-                          <div className="mov-actionsInline">
-                            <button
-                              className="mov-iconBtn"
-                              type="button"
-                              onClick={() => openIncome(item)}
-                              title="Editar"
+                          {item.origen_modulo === "VENTAS" ? (
+                            <span
+                              className="contable-lockedAction"
+                              title="Se administra desde Ventas"
                             >
-                              <FontAwesomeIcon icon={faPen} />
-                            </button>
-                            <button
-                              className="mov-iconBtn mov-iconBtn--danger"
-                              type="button"
-                              onClick={() =>
-                                setDeleteTarget({ type: "income", item })
-                              }
-                              title="Anular"
-                            >
-                              <FontAwesomeIcon icon={faTrashCan} />
-                            </button>
-                          </div>
+                              Automático
+                            </span>
+                          ) : (
+                            <div className="mov-actionsInline">
+                              <button
+                                className="mov-iconBtn"
+                                type="button"
+                                onClick={() => openIncome(item)}
+                                title="Editar"
+                              >
+                                <FontAwesomeIcon icon={faPen} />
+                              </button>
+                              <button
+                                className="mov-iconBtn mov-iconBtn--danger"
+                                type="button"
+                                onClick={() =>
+                                  setDeleteTarget({ type: "income", item })
+                                }
+                                title="Anular"
+                              >
+                                <FontAwesomeIcon icon={faTrashCan} />
+                              </button>
+                            </div>
+                          )}
                         </div>
                       ) : null}
                     </div>
