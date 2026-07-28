@@ -37,17 +37,27 @@ const emptyConfig = () => ({
 
 function Empty({ loading }) {
   return (
-    <div className="sales-empty">
-      <FontAwesomeIcon icon={faCashRegister} />
-      <strong>
-        {loading ? "Cargando configuración..." : "No hay cajas configuradas"}
-      </strong>
-      <span>
-        {loading
-          ? "Consultando las cajas, sedes y canales de venta."
-          : "Creá una caja, sede, punto o canal para poder registrar ventas."}
+    <section
+      className={`sales-empty ${loading ? "is-loading" : ""}`}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="sales-empty__icon" aria-hidden="true">
+        <FontAwesomeIcon icon={faCashRegister} />
       </span>
-    </div>
+      <div className="sales-empty__copy">
+        <strong>
+          {loading
+            ? "Cargando configuración..."
+            : "Todavía no hay cajas configuradas"}
+        </strong>
+        <p>
+          {loading
+            ? "Estamos consultando las cajas, sedes y canales de venta."
+            : "Creá tu primera caja, sede, punto o canal para comenzar a registrar ventas."}
+        </p>
+      </div>
+    </section>
   );
 }
 

@@ -108,6 +108,87 @@
   overflow: visible;
 }
 
+.sales-settingsPage .sales-empty {
+  position: relative;
+  isolation: isolate;
+  width: auto;
+  min-height: clamp(260px, 42vh, 420px);
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin: 0 20px 20px;
+  padding: 36px 24px;
+  overflow: hidden;
+  border: 1px dashed
+    color-mix(in srgb, var(--balto-action) 30%, var(--mov-border));
+  border-radius: var(--blue-inst-radius-lg, 16px);
+  color: var(--balto-text);
+  text-align: center;
+  background:
+    radial-gradient(
+      circle at 50% 0,
+      color-mix(in srgb, var(--balto-action) 9%, transparent) 0,
+      transparent 42%
+    ),
+    color-mix(in srgb, var(--balto-bg) 34%, #fff);
+}
+
+.sales-settingsPage .sales-empty__icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  flex: 0 0 64px;
+  place-items: center;
+  border: 1px solid
+    color-mix(in srgb, var(--balto-action) 24%, transparent);
+  border-radius: 18px;
+  color: var(--balto-action);
+  background: color-mix(in srgb, var(--balto-action) 10%, #fff);
+  box-shadow: 0 12px 28px
+    color-mix(in srgb, var(--balto-action) 13%, transparent);
+  font-size: 24px;
+}
+
+.sales-settingsPage .sales-empty__copy {
+  max-width: 540px;
+}
+
+.sales-settingsPage .sales-empty__copy strong {
+  display: block;
+  color: var(--balto-ink);
+  font-size: clamp(15px, 1.3vw, 18px);
+  font-weight: 720;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.sales-settingsPage .sales-empty__copy p {
+  margin: 7px 0 0;
+  color: var(--balto-text);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.sales-settingsPage .sales-empty.is-loading .sales-empty__icon {
+  animation: sales-empty-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sales-empty-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.78;
+  }
+
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
 .sales-settingsPage .sales-cardGrid {
   display: grid;
   flex: 1 1 auto;
@@ -423,6 +504,20 @@
 }
 
 @media (max-width: 680px) {
+  .sales-settingsPage .sales-empty {
+    min-height: 250px;
+    margin: 0 12px 14px;
+    padding: 30px 18px;
+  }
+
+  .sales-settingsPage .sales-empty__icon {
+    width: 56px;
+    height: 56px;
+    flex-basis: 56px;
+    border-radius: 16px;
+    font-size: 21px;
+  }
+
   .sales-settingsPage .sales-cardGrid {
     grid-template-columns: 1fr;
     padding: 10px 12px 14px;
@@ -430,5 +525,11 @@
 
   .sales-settingsPage .sales-configCard__facts {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sales-settingsPage .sales-empty.is-loading .sales-empty__icon {
+    animation: none;
   }
 }
