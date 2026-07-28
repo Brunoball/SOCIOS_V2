@@ -494,6 +494,7 @@ export default function VentasModule() {
       type: "search",
       label: "Búsqueda",
       value: productSearch,
+      placeholder: " ",
       onChange: setProductSearch,
     });
   } else {

@@ -8,6 +8,7 @@
 .sales-settingsPage .module-stats {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
+  padding: 10px;
 }
 
 .sales-settingsPage .module-stat {
@@ -114,7 +115,7 @@
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   align-content: start;
   gap: 12px;
-  padding: 14px;
+  padding: 14px 20px 18px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -264,11 +265,17 @@
 }
 
 .sales-settingsPage .sales-iconButton {
-  width: 31px;
-  height: 31px;
+  width: 26px;
+  min-width: 26px;
+  height: 24px;
+  min-height: 24px;
+  flex: 0 0 26px;
+  padding: 0;
+  box-sizing: border-box;
   border-color: color-mix(in srgb, var(--balto-ink) 12%, transparent);
-  border-radius: 9px;
+  border-radius: 7px;
   color: var(--balto-ink);
+  font-size: 10px;
 }
 
 .sales-settingsPage .sales-iconButton:hover {
@@ -418,7 +425,7 @@
 @media (max-width: 680px) {
   .sales-settingsPage .sales-cardGrid {
     grid-template-columns: 1fr;
-    padding: 10px;
+    padding: 10px 12px 14px;
   }
 
   .sales-settingsPage .sales-configCard__facts {
