@@ -177,6 +177,7 @@ export function ModulePage({
   canCreate = true,
   refreshing = false,
   tabsInTitle = false,
+  className = "",
   children,
   notice,
 }) {
@@ -188,7 +189,7 @@ export function ModulePage({
     : filters;
 
   return (
-    <section className="mov-page module-page">
+    <section className={`mov-page module-page ${className}`.trim()}>
       {stats.length ? (
         <section className="module-stats" aria-label={`Resumen de ${title}`}>
           {stats.map((stat) => (

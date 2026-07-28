@@ -1,14 +1,42 @@
+.config-homePage {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+.config-sectionPage {
+  height: 100%;
+  min-height: 0;
+}
+
+.config-sectionPage .module-card {
+  min-height: 0;
+}
+
 .config-homeIntro {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 13px;
-  margin: 0 18px 4px;
+  margin: 12px 18px 18px;
   padding: 14px 16px;
   border: 1px solid rgba(196, 139, 59, 0.18);
   border-radius: 16px;
   background:
-    linear-gradient(135deg, rgba(253, 251, 247, 0.96), rgba(255, 255, 255, 0.88)),
-    radial-gradient(circle at top left, rgba(196, 139, 59, 0.15), transparent 38%);
+    linear-gradient(
+      135deg,
+      rgba(253, 251, 247, 0.96),
+      rgba(255, 255, 255, 0.88)
+    ),
+    radial-gradient(
+      circle at top left,
+      rgba(196, 139, 59, 0.15),
+      transparent 38%
+    );
 }
 
 .config-homeIntro__icon,
@@ -20,7 +48,11 @@
   place-items: center;
   border-radius: 13px;
   color: #fff;
-  background: linear-gradient(135deg, var(--balto-midnight), var(--balto-action));
+  background: linear-gradient(
+    135deg,
+    var(--balto-midnight),
+    var(--balto-action)
+  );
   box-shadow: 0 13px 24px -17px rgba(58, 46, 43, 0.62);
   font-size: 16px;
 }
@@ -56,27 +88,31 @@
 }
 
 .config-accessGrid {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
+  max-height: none;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   align-content: start;
   gap: 12px;
   padding: 12px 18px 18px;
+  overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-gutter: stable;
-}
-
-.config-accessCardWrap {
-  min-width: 0;
+ max-height: calc(100vh - 220px);
 }
 
 .config-accessCard {
   width: 100%;
-  min-height: 178px;
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
+  min-width: 0;
+  display: grid;
+  grid-template-areas:
+    "icon title status"
+    "icon description description"
+    "meta meta arrow";
+  grid-template-columns: 42px minmax(0, 1fr) auto;
+  column-gap: 12px;
+  row-gap: 0;
+  align-items: start;
   padding: 14px;
   border: 1px solid rgba(58, 46, 43, 0.13);
   border-radius: 15px;
@@ -105,13 +141,8 @@
   box-shadow: var(--mov-focus);
 }
 
-.config-accessCard__main {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
 .config-accessCard__icon {
+  grid-area: icon;
   width: 42px;
   height: 42px;
   min-width: 42px;
@@ -124,19 +155,10 @@
   font-size: 15px;
 }
 
-.config-accessCard__body {
+.config-accessCard__title {
+  grid-area: title;
   min-width: 0;
-  flex: 1;
-}
-
-.config-accessCard__titleRow {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.config-accessCard__titleRow h2 {
+  display: block;
   margin: 2px 0 0;
   color: var(--balto-midnight);
   font-size: 13.5px;
@@ -146,6 +168,7 @@
 }
 
 .config-accessCard__status {
+  grid-area: status;
   min-height: 22px;
   display: inline-flex;
   align-items: center;
@@ -160,28 +183,26 @@
   white-space: nowrap;
 }
 
-.config-accessCard__body p {
+.config-accessCard__description {
+  grid-area: description;
+  min-width: 0;
+  display: block;
   margin: 7px 0 0;
   color: var(--balto-text);
   font-size: 11px;
   line-height: 1.43;
 }
 
-.config-accessCard__footer {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: auto;
-  padding-top: 10px;
-  border-top: 1px solid rgba(58, 46, 43, 0.08);
-}
-
 .config-accessCard__meta {
+  grid-area: meta;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 5px;
+  align-self: end;
+  margin-top: 13px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(58, 46, 43, 0.08);
 }
 
 .config-accessCard__meta span {
@@ -204,6 +225,7 @@
 }
 
 .config-accessCard__arrow {
+  grid-area: arrow;
   width: 29px;
   height: 29px;
   min-width: 29px;
@@ -214,7 +236,12 @@
   color: var(--balto-text);
   background: var(--balto-bg);
   font-size: 9px;
-  transition: transform var(--mov-trans), color var(--mov-trans), border-color var(--mov-trans);
+  align-self: end;
+  margin-top: 13px;
+  transition:
+    transform var(--mov-trans),
+    color var(--mov-trans),
+    border-color var(--mov-trans);
 }
 
 .config-accessCard:hover .config-accessCard__arrow {
@@ -401,7 +428,10 @@
   color: var(--balto-midnight);
   background: #fff;
   cursor: pointer;
-  transition: transform var(--mov-trans), border-color var(--mov-trans), color var(--mov-trans);
+  transition:
+    transform var(--mov-trans),
+    border-color var(--mov-trans),
+    color var(--mov-trans);
 }
 
 .config-iconButton:hover {
@@ -461,10 +491,6 @@
     grid-template-columns: 1fr;
   }
 
-  .config-accessCard {
-    min-height: 164px;
-  }
-
   .config-amountForm {
     grid-template-columns: 1fr;
   }
@@ -485,10 +511,6 @@
   .config-accessGrid {
     padding-right: 12px;
     padding-left: 12px;
-  }
-
-  .config-accessCard__titleRow {
-    flex-direction: column;
   }
 
   .config-detailPanel {

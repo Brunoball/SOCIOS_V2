@@ -192,32 +192,21 @@ const emptyListForm = (lista = "medios_pago") => ({
 
 function ConfigAccessCard({ icon, title, description, status, area, detail, onClick }) {
   return (
-    <article className="config-accessCardWrap">
-      <button type="button" className="config-accessCard" onClick={onClick}>
-        <div className="config-accessCard__main">
-          <span className="config-accessCard__icon" aria-hidden="true">
-            <FontAwesomeIcon icon={icon} />
-          </span>
-          <div className="config-accessCard__body">
-            <div className="config-accessCard__titleRow">
-              <h2>{title}</h2>
-              <span className="config-accessCard__status">{status}</span>
-            </div>
-            <p>{description}</p>
-          </div>
-        </div>
-
-        <footer className="config-accessCard__footer">
-          <div className="config-accessCard__meta">
-            <span><small>ÁREA</small>{area}</span>
-            <span><small>DETALLE</small>{detail}</span>
-          </div>
-          <span className="config-accessCard__arrow" aria-hidden="true">
-            <FontAwesomeIcon icon={faChevronRight} />
-          </span>
-        </footer>
-      </button>
-    </article>
+    <button type="button" className="config-accessCard" onClick={onClick}>
+      <span className="config-accessCard__icon" aria-hidden="true">
+        <FontAwesomeIcon icon={icon} />
+      </span>
+      <strong className="config-accessCard__title">{title}</strong>
+      <span className="config-accessCard__status">{status}</span>
+      <span className="config-accessCard__description">{description}</span>
+      <span className="config-accessCard__meta">
+        <span><small>ÁREA</small>{area}</span>
+        <span><small>DETALLE</small>{detail}</span>
+      </span>
+      <span className="config-accessCard__arrow" aria-hidden="true">
+        <FontAwesomeIcon icon={faChevronRight} />
+      </span>
+    </button>
   );
 }
 
@@ -454,23 +443,23 @@ export default function ConfiguracionModule({ group = null }) {
 
   if (!activeGroup) {
     return (
-      <ModulePage
-        title="Configuración"
-        description="Elegí una tarjeta para administrar cada parte del sistema de forma independiente."
-        canCreate={false}
-        notice={!writable ? "Tu usuario tiene permiso de consulta. Las modificaciones están deshabilitadas." : null}
-      >
+      <section className="config-homePage">
         {feedbackNode}
-        <div className="config-homeIntro">
+        {!writable ? (
+          <div className="module-notice">
+            Tu usuario tiene permiso de consulta. Las modificaciones están deshabilitadas.
+          </div>
+        ) : null}
+        <header className="config-homeIntro">
           <span className="config-homeIntro__icon" aria-hidden="true"><FontAwesomeIcon icon={faGear} /></span>
           <div>
             <small>PANEL DE CONFIGURACIÓN</small>
             <strong>Todo organizado en accesos independientes</strong>
             <p>Ingresá a una de las áreas y elegí la opción que necesitás desde sus pestañas.</p>
           </div>
-        </div>
+        </header>
 
-        <div className="config-accessGrid">
+        <nav className="config-accessGrid" aria-label="Áreas de configuración">
           {accessCards.map((card) => (
             <ConfigAccessCard
               key={card.id}
@@ -484,8 +473,8 @@ export default function ConfiguracionModule({ group = null }) {
               }}
             />
           ))}
-        </div>
-      </ModulePage>
+        </nav>
+      </section>
     );
   }
 
@@ -494,6 +483,7 @@ export default function ConfiguracionModule({ group = null }) {
   return (
     <>
       <ModulePage
+        className="config-sectionPage"
         title={activeGroupMeta.title}
         description={activeGroupMeta.description}
         filters={groupTabs}

@@ -4,20 +4,24 @@ import {
   faArrowLeft,
   faCashRegister,
   faChartLine,
+  faCircleInfo,
   faPen,
+  faTags,
+  faTrashCan,
   faToggleOff,
   faToggleOn,
   faUserCheck,
 } from "@fortawesome/free-solid-svg-icons";
 import { ModulePage } from "../../Global/components/ModulePage";
 import ModuleFeedback from "../../Global/components/ModuleFeedback";
+import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
 import { canWrite } from "../../Global/auth/session";
 import { ventasApi } from "../../Ventas/api/ventasApi";
 import { apiPost } from "../../Global/api/apiClient";
 import { uppercaseConfigText } from "../../Ventas/utils/textCase";
 import ConfiguracionVentaModal from "./modales/ConfiguracionVentaModal";
-import ConfiguracionAccionesModal from "./modales/ConfiguracionAccionesModal";
 import "../../Ventas/shared/Ventas.css";
+import "./VentasConfiguracion.css";
 
 const emptyConfig = () => ({
   id_configuracion: "",
@@ -35,7 +39,9 @@ function Empty({ loading }) {
   return (
     <div className="sales-empty">
       <FontAwesomeIcon icon={faCashRegister} />
-      <strong>{loading ? "Cargando configuración..." : "No hay cajas configuradas"}</strong>
+      <strong>
+        {loading ? "Cargando configuración..." : "No hay cajas configuradas"}
+      </strong>
       <span>
         {loading
           ? "Consultando las cajas, sedes y canales de venta."
@@ -47,7 +53,9 @@ function Empty({ loading }) {
 
 function StatusBadge({ active }) {
   return (
-    <span className={`sales-status sales-status--${active ? "activa" : "inactiva"}`}>
+    <span
+      className={`sales-status sales-status--${active ? "activa" : "inactiva"}`}
+    >
       {active ? "ACTIVA" : "INACTIVA"}
     </span>
   );
@@ -68,6 +76,24 @@ function ActionButton({ icon, label, onClick, tone = "", disabled = false }) {
   );
 }
 
+function InfoTooltip({ id, text }) {
+  return (
+    <span className="sales-infoTooltip">
+      <button
+        type="button"
+        className="sales-infoTooltip__trigger"
+        aria-label="Ver información sobre los medios de pago"
+        aria-describedby={id}
+      >
+        <FontAwesomeIcon icon={faCircleInfo} />
+      </button>
+      <span className="sales-infoTooltip__content" id={id} role="tooltip">
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export default function VentasConfiguracion({ onBack }) {
   const writable = canWrite();
   const [catalogs, setCatalogs] = useState({
@@ -81,7 +107,7 @@ export default function VentasConfiguracion({ onBack }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(null);
-  const [actionItem, setActionItem] = useState(null);
+  const [actionModal, setActionModal] = useState(null);
   const [feedback, setFeedback] = useState(null);
 
   const load = useCallback(async () => {
@@ -95,7 +121,8 @@ export default function VentasConfiguracion({ onBack }) {
     } catch (error) {
       setFeedback({
         type: "error",
-        message: error?.message || "No se pudo cargar la configuración de ventas.",
+        message:
+          error?.message || "No se pudo cargar la configuración de ventas.",
       });
     } finally {
       setLoading(false);
@@ -156,11 +183,15 @@ export default function VentasConfiguracion({ onBack }) {
       await ventasApi.guardarConfiguracion(payload);
       setForm(null);
       await load();
-      setFeedback({ type: "success", message: "Configuración de ventas guardada correctamente." });
+      setFeedback({
+        type: "success",
+        message: "Configuración de ventas guardada correctamente.",
+      });
     } catch (error) {
       setFeedback({
         type: "error",
-        message: error?.message || "No se pudo guardar la configuración de ventas.",
+        message:
+          error?.message || "No se pudo guardar la configuración de ventas.",
       });
     } finally {
       setSaving(false);
@@ -169,21 +200,14 @@ export default function VentasConfiguracion({ onBack }) {
 
   const toggle = async (item) => {
     setSaving(true);
-    setFeedback(null);
     try {
       await ventasApi.estadoConfiguracion(item.id_configuracion, !item.activo);
       await load();
-      setFeedback({
-        type: "success",
-        message: item.activo ? "Configuración dada de baja." : "Configuración reactivada.",
-      });
-      return true;
+      return { ok: true };
     } catch (error) {
-      setFeedback({
-        type: "error",
-        message: error?.message || "No se pudo cambiar el estado de la configuración.",
-      });
-      return false;
+      throw new Error(
+        error?.message || "No se pudo cambiar el estado de la configuración.",
+      );
     } finally {
       setSaving(false);
     }
@@ -191,23 +215,16 @@ export default function VentasConfiguracion({ onBack }) {
 
   const remove = async (item) => {
     setSaving(true);
-    setFeedback(null);
     try {
       await apiPost("ventas_configuracion_eliminar", {
         id_configuracion: item.id_configuracion,
       });
       await load();
-      setFeedback({
-        type: "success",
-        message: "Configuración de ventas eliminada definitivamente.",
-      });
-      return true;
+      return { ok: true };
     } catch (error) {
-      setFeedback({
-        type: "error",
-        message: error?.message || "No se pudo eliminar la configuración de ventas.",
-      });
-      return false;
+      throw new Error(
+        error?.message || "No se pudo eliminar la configuración de ventas.",
+      );
     } finally {
       setSaving(false);
     }
@@ -216,22 +233,33 @@ export default function VentasConfiguracion({ onBack }) {
   return (
     <>
       <ModulePage
-        title="Configuración de ventas"
+        className="sales-settingsPage"
+        title={
+          <span className="sales-titleWithInfo">
+            <span>Configuración de ventas</span>
+            <InfoTooltip
+              id="sales-settings-payment-info"
+              text="El medio de pago no se configura acá: se selecciona individualmente al registrar cada venta."
+            />
+          </span>
+        }
         description="Administrá las cajas, sedes, puntos o canales usados al registrar ventas."
         stats={stats}
         primaryActionLabel="Nueva configuración"
         onPrimaryAction={() => setForm(emptyConfig())}
         canCreate={writable}
-        secondaryActions={[{
-          key: "volver",
-          label: "Volver a configuración",
-          icon: faArrowLeft,
-          onClick: onBack,
-        }]}
+        secondaryActions={[
+          {
+            key: "volver",
+            label: "Volver a configuración",
+            icon: faArrowLeft,
+            onClick: onBack,
+          },
+        ]}
         notice={
           !writable
             ? "Tu usuario tiene permiso de consulta. Las modificaciones están deshabilitadas."
-            : "El medio de pago no se configura acá: se selecciona individualmente al registrar cada venta."
+            : null
         }
       >
         {loading ? <Empty loading /> : null}
@@ -243,55 +271,117 @@ export default function VentasConfiguracion({ onBack }) {
                 className={`sales-configCard ${!item.activo ? "is-inactive" : ""}`}
                 key={item.id_configuracion}
               >
-                <header>
-                  <span className="sales-cardIcon">
-                    <FontAwesomeIcon icon={faCashRegister} />
-                  </span>
-                  <div>
-                    <h3>{item.nombre}</h3>
-                    <StatusBadge active={Boolean(item.activo)} />
-                  </div>
-                  {writable ? (
-                    <div className="sales-actions">
-                      <ActionButton
-                        icon={faPen}
-                        label="Editar"
-                        onClick={() => edit(item)}
-                        disabled={saving}
-                      />
-                      <ActionButton
-                        icon={item.activo ? faToggleOff : faToggleOn}
-                        label={item.activo ? "Dar de baja o eliminar" : "Reactivar o eliminar"}
-                        tone={item.activo ? "danger" : "success"}
-                        onClick={() => setActionItem(item)}
-                        disabled={saving}
-                      />
+                  <header>
+                    <span className="sales-cardIcon" aria-hidden="true">
+                      <FontAwesomeIcon icon={faCashRegister} />
+                    </span>
+                    <div className="sales-configCard__identity">
+                      <h3>{item.nombre}</h3>
+                      <StatusBadge active={Boolean(item.activo)} />
                     </div>
-                  ) : null}
-                </header>
-                <p>{item.descripcion || "Sin descripción."}</p>
-                <dl>
-                  <div>
-                    <dt>Impacto contable</dt>
-                    <dd>{item.impacta_contable ? "AUTOMÁTICO" : "DESACTIVADO"}</dd>
+                    {writable ? (
+                      <div className="sales-actions">
+                        <ActionButton
+                          icon={faPen}
+                          label="Editar"
+                          onClick={() => edit(item)}
+                          disabled={saving}
+                        />
+                        <ActionButton
+                          icon={item.activo ? faToggleOff : faToggleOn}
+                          label={item.activo ? "Dar de baja" : "Reactivar"}
+                          tone={item.activo ? "danger" : "success"}
+                          onClick={() =>
+                            setActionModal({
+                              type: item.activo ? "baja" : "alta",
+                              item,
+                            })
+                          }
+                          disabled={saving}
+                        />
+                        <ActionButton
+                          icon={faTrashCan}
+                          label="Eliminar"
+                          tone="danger"
+                          onClick={() =>
+                            setActionModal({ type: "eliminar", item })
+                          }
+                          disabled={saving}
+                        />
+                      </div>
+                    ) : null}
+                  </header>
+                  <p>{item.descripcion || "Sin descripción."}</p>
+                  <div className="sales-configCard__facts">
+                    <div className="sales-configCard__fact">
+                      <span
+                        className="sales-configCard__factIcon"
+                        aria-hidden="true"
+                      >
+                        <FontAwesomeIcon icon={faChartLine} />
+                      </span>
+                      <div className="sales-configCard__factContent">
+                        <span className="sales-configCard__factLabel">
+                          Impacto contable
+                        </span>
+                        <strong className="sales-configCard__factValue">
+                          {item.impacta_contable ? "Automático" : "Desactivado"}
+                        </strong>
+                      </div>
+                    </div>
+                    <div className="sales-configCard__fact">
+                      <span
+                        className="sales-configCard__factIcon"
+                        aria-hidden="true"
+                      >
+                        <FontAwesomeIcon icon={faTags} />
+                      </span>
+                      <div className="sales-configCard__factContent">
+                        <span className="sales-configCard__factLabel">
+                          Categoría / concepto
+                        </span>
+                        <strong className="sales-configCard__factValue">
+                          {item.impacta_contable
+                            ? `${item.categoria_nombre || "—"} · ${item.concepto_nombre || "—"}`
+                            : "—"}
+                        </strong>
+                      </div>
+                    </div>
+                    <div className="sales-configCard__fact">
+                      <span
+                        className="sales-configCard__factIcon"
+                        aria-hidden="true"
+                      >
+                        <FontAwesomeIcon icon={faUserCheck} />
+                      </span>
+                      <div className="sales-configCard__factContent">
+                        <span className="sales-configCard__factLabel">
+                          Comprador
+                        </span>
+                        <strong className="sales-configCard__factValue">
+                          {item.solicita_comprador ? "Obligatorio" : "Opcional"}
+                        </strong>
+                      </div>
+                    </div>
+                    <div className="sales-configCard__fact">
+                      <span
+                        className="sales-configCard__factIcon"
+                        aria-hidden="true"
+                      >
+                        <FontAwesomeIcon icon={faPen} />
+                      </span>
+                      <div className="sales-configCard__factContent">
+                        <span className="sales-configCard__factLabel">
+                          Precio manual
+                        </span>
+                        <strong className="sales-configCard__factValue">
+                          {item.permite_precio_manual
+                            ? "Permitido"
+                            : "Bloqueado"}
+                        </strong>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <dt>Categoría / concepto</dt>
-                    <dd>
-                      {item.impacta_contable
-                        ? `${item.categoria_nombre || "—"} · ${item.concepto_nombre || "—"}`
-                        : "—"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Comprador</dt>
-                    <dd>{item.solicita_comprador ? "OBLIGATORIO" : "OPCIONAL"}</dd>
-                  </div>
-                  <div>
-                    <dt>Precio manual</dt>
-                    <dd>{item.permite_precio_manual ? "PERMITIDO" : "BLOQUEADO"}</dd>
-                  </div>
-                </dl>
               </article>
             ))}
           </div>
@@ -306,12 +396,86 @@ export default function VentasConfiguracion({ onBack }) {
         onSubmit={submit}
       />
 
-      <ConfiguracionAccionesModal
-        item={actionItem}
-        saving={saving}
-        onClose={() => !saving && setActionItem(null)}
-        onChangeStatus={toggle}
-        onDelete={remove}
+      <ModalEliminarGlobal
+        open={Boolean(actionModal)}
+        operacion={actionModal?.type || "advertencia"}
+        row={actionModal?.item || null}
+        title={
+          actionModal?.type === "eliminar"
+            ? "Eliminar configuración"
+            : actionModal?.type === "baja"
+              ? "Dar de baja configuración"
+              : "Reactivar configuración"
+        }
+        message={
+          actionModal?.type === "eliminar"
+            ? "La configuración se eliminará definitivamente si todavía no fue utilizada en ninguna venta."
+            : actionModal?.type === "baja"
+              ? "La configuración dejará de estar disponible al registrar ventas, pero se conservará para mantener el historial."
+              : "La configuración volverá a estar disponible al registrar ventas."
+        }
+        warning={
+          actionModal?.type === "eliminar"
+            ? "Si ya tiene ventas asociadas, deberás darla de baja en lugar de eliminarla."
+            : ""
+        }
+        confirmLabel={
+          actionModal?.type === "eliminar"
+            ? "Eliminar"
+            : actionModal?.type === "baja"
+              ? "Dar de baja"
+              : "Reactivar"
+        }
+        loadingLabel={
+          actionModal?.type === "eliminar"
+            ? "Eliminando..."
+            : actionModal?.type === "baja"
+              ? "Dando de baja..."
+              : "Reactivando..."
+        }
+        loadingMessage={
+          actionModal?.type === "eliminar"
+            ? "Eliminando configuración…"
+            : actionModal?.type === "baja"
+              ? "Dando de baja la configuración…"
+              : "Reactivando configuración…"
+        }
+        successMessage={
+          actionModal?.type === "eliminar"
+            ? "Configuración eliminada correctamente."
+            : actionModal?.type === "baja"
+              ? "Configuración dada de baja correctamente."
+              : "Configuración reactivada correctamente."
+        }
+        errorMessage={
+          actionModal?.type === "eliminar"
+            ? "No se pudo eliminar la configuración."
+            : "No se pudo cambiar el estado de la configuración."
+        }
+        details={
+          actionModal
+            ? [
+                { label: "Configuración", value: actionModal.item?.nombre },
+                {
+                  label: "Estado actual",
+                  value: actionModal.item?.activo ? "ACTIVA" : "INACTIVA",
+                },
+                {
+                  label: "Impacto contable",
+                  value: actionModal.item?.impacta_contable
+                    ? "AUTOMÁTICO"
+                    : "DESACTIVADO",
+                },
+              ]
+            : []
+        }
+        loading={saving}
+        onClose={() => !saving && setActionModal(null)}
+        onConfirm={() =>
+          actionModal?.type === "eliminar"
+            ? remove(actionModal.item)
+            : toggle(actionModal.item)
+        }
       />
 
       <ModuleFeedback

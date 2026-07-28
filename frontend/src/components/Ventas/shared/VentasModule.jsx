@@ -2,17 +2,18 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowRotateLeft,
-  faBoxesStacked,
   faBan,
   faCashRegister,
   faCheck,
-  faCircleExclamation,
+  faCircleInfo,
   faPen,
+  faPlus,
   faReceipt,
   faToggleOff,
   faToggleOn,
   faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
+import GlobalDivTable from "../../Global/components/GlobalDivTable";
 import { ModulePage } from "../../Global/components/ModulePage";
 import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../../Global/components/ModuleFeedback";
@@ -51,6 +52,12 @@ const formatDate = (value) =>
       )
     : "—";
 
+const normalizeSearch = (value) =>
+  String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleUpperCase("es-AR");
+
 const emptyProduct = () => ({
   id_producto: "",
   codigo: "",
@@ -80,7 +87,7 @@ const emptySale = () => ({
 
 function Empty({ loading, text }) {
   return (
-    <div className="sales-empty">
+    <div className="module-empty">
       <FontAwesomeIcon icon={loading ? faCashRegister : faReceipt} />
       <strong>{loading ? "Cargando ventas..." : "No hay registros"}</strong>
       <span>
@@ -91,26 +98,49 @@ function Empty({ loading, text }) {
 }
 
 function StatusBadge({ state }) {
+  const normalizedState = String(state).toUpperCase();
+  const tone =
+    normalizedState === "CONFIRMADA" || normalizedState === "ACTIVO"
+      ? "mov-chip--ok"
+      : normalizedState === "ANULADA" || normalizedState === "INACTIVO"
+        ? "mov-chip--danger"
+        : "mov-chip--neutral";
+
+  return <span className={`mov-chip ${tone}`}>{state}</span>;
+}
+
+function InfoTooltip({ id, text }) {
   return (
-    <span
-      className={`sales-status sales-status--${String(state).toLowerCase()}`}
-    >
-      {state}
+    <span className="sales-infoTooltip">
+      <button
+        type="button"
+        className="sales-infoTooltip__trigger"
+        aria-label="Ver información"
+        aria-describedby={id}
+      >
+        <FontAwesomeIcon icon={faCircleInfo} />
+      </button>
+      <span className="sales-infoTooltip__content" id={id} role="tooltip">
+        {text}
+      </span>
     </span>
   );
 }
 
-function ActionButton({ icon, label, onClick, tone = "" }) {
+function SalesSummary({ stats }) {
   return (
-    <button
-      type="button"
-      className={`sales-iconButton ${tone ? `sales-iconButton--${tone}` : ""}`}
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-    >
-      <FontAwesomeIcon icon={icon} />
-    </button>
+    <section className="sales-summary" aria-label="Resumen de ventas">
+      <strong>Resumen de ventas</strong>
+      <div>
+        {stats.map((stat) => (
+          <article key={stat.label}>
+            <span>{stat.label}</span>
+            <small>{stat.detail}</small>
+            <b>{stat.value}</b>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -137,11 +167,13 @@ export default function VentasModule() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [search, setSearch] = useState("");
+  const [productSearch, setProductSearch] = useState("");
   const [stateFilter, setStateFilter] = useState("");
   const [configFilter, setConfigFilter] = useState("");
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [productForm, setProductForm] = useState(null);
+  const [productAction, setProductAction] = useState(null);
   const [saleForm, setSaleForm] = useState(null);
   const [saleAction, setSaleAction] = useState(null);
   const [partnerSearch, setPartnerSearch] = useState("");
@@ -274,11 +306,26 @@ export default function VentasModule() {
     saleSubtotal - Number(saleForm?.descuento || 0),
   );
 
+  const filteredProducts = useMemo(() => {
+    const term = normalizeSearch(productSearch.trim());
+    if (!term) return catalogs.productos;
+
+    return catalogs.productos.filter((item) =>
+      [item.codigo, item.nombre, item.descripcion].some((value) =>
+        normalizeSearch(value).includes(term),
+      ),
+    );
+  }, [catalogs.productos, productSearch]);
+
   const openNewProduct = () => setProductForm(emptyProduct());
   const openNewSale = () => {
     const firstConfig = catalogs.configuraciones.find((item) => item.activo);
     if (!firstConfig) {
-      showError(new Error("Primero configurá una caja, sede o canal desde Configuración > Ventas."));
+      showError(
+        new Error(
+          "Primero configurá una caja, sede o canal desde Configuración > Ventas.",
+        ),
+      );
       return;
     }
     const form = emptySale();
@@ -354,20 +401,29 @@ export default function VentasModule() {
   };
 
   const toggleProduct = async (item) => {
+    if (item.activo) {
+      setProductAction(item);
+      return;
+    }
+
     try {
-      await ventasApi.estadoProducto(item.id_producto, !item.activo);
+      await ventasApi.estadoProducto(item.id_producto, true);
       await refresh();
-      showSuccess(
-        item.activo ? "Producto desactivado." : "Producto reactivado.",
-      );
+      showSuccess("Producto reactivado.");
     } catch (error) {
       showError(error);
     }
   };
 
+  const confirmProductDeactivation = async () => {
+    if (!productAction) return { ok: false };
+    await ventasApi.estadoProducto(productAction.id_producto, false);
+    await refresh();
+    return { mensaje: "Producto desactivado correctamente." };
+  };
+
   const changeSaleState = async (item, target) => {
-    const verb =
-      target === "CONFIRMADA" ? "confirmar" : "pasar a pendiente";
+    const verb = target === "CONFIRMADA" ? "confirmar" : "pasar a pendiente";
     if (!window.confirm(`¿Deseás ${verb} la venta ${item.codigo}?`)) return;
     try {
       await ventasApi.estadoVenta(item.id_venta, target);
@@ -432,19 +488,28 @@ export default function VentasModule() {
       onChange: setTab,
     },
   ];
-  if (tab === "ventas") {
+  if (tab === "productos") {
+    filters.push({
+      key: "buscar-producto",
+      type: "search",
+      label: "Búsqueda",
+      value: productSearch,
+      onChange: setProductSearch,
+    });
+  } else {
     filters.push(
       {
         key: "buscar",
         type: "search",
         label: "Buscar",
         value: search,
-        placeholder: "Código, comprador o producto...",
+        placeholder: " ",
         onChange: setSearch,
       },
       {
         key: "estado",
         type: "select",
+        className: "sales-filter--state",
         label: "Estado",
         value: stateFilter,
         placeholder: "Todos los estados",
@@ -454,6 +519,7 @@ export default function VentasModule() {
       {
         key: "config",
         type: "select",
+        className: "sales-filter--channel",
         label: "Caja o canal",
         value: configFilter,
         placeholder: "Todas las cajas y canales",
@@ -466,6 +532,7 @@ export default function VentasModule() {
       {
         key: "month",
         type: "select",
+        className: "sales-filter--month",
         label: "Mes",
         value: month,
         includeEmptyOption: true,
@@ -481,6 +548,7 @@ export default function VentasModule() {
       {
         key: "year",
         type: "select",
+        className: "sales-filter--year",
         label: "Año",
         value: year,
         includeEmptyOption: false,
@@ -498,138 +566,187 @@ export default function VentasModule() {
       label: "Vendido este mes",
       value: money(catalogs.resumen.total_mes),
       detail: `${catalogs.resumen.ventas_mes || 0} ventas confirmadas`,
-      icon: faCashRegister,
     },
     {
       label: "Productos activos",
       value: catalogs.resumen.productos_activos || 0,
       detail: `${catalogs.resumen.productos_stock_bajo || 0} con stock bajo`,
-      icon: faBoxesStacked,
     },
     {
       label: "Pendientes",
       value: catalogs.resumen.ventas_pendientes || 0,
       detail: "Sin impacto en stock ni contable",
-      icon: faCircleExclamation,
     },
   ];
+  const registeredSalesStats = [
+    {
+      label: "Total confirmado",
+      value: money(salesSummary.total),
+      detail: "Ventas confirmadas del período",
+    },
+    ...stats.slice(1),
+  ];
 
-  const primaryLabel = tab === "productos" ? "Nuevo producto" : "Registrar venta";
+  const primaryLabel =
+    tab === "productos" ? "Nuevo producto" : "Registrar venta";
   const primaryAction = tab === "productos" ? openNewProduct : openNewSale;
 
   return (
     <>
       <ModulePage
-        title="Ventas"
+        title={
+          <span className="sales-titleWithInfo">
+            <span>Ventas</span>
+            <InfoTooltip
+              id="sales-title-info"
+              text={
+                tab === "productos"
+                  ? "Los productos pueden ser artículos con stock o servicios sin control de existencias."
+                  : "Elegí el medio de pago al registrar cada venta. Solo las ventas confirmadas descuentan stock y generan un ingreso contable."
+              }
+            />
+          </span>
+        }
         description="Productos y ventas registradas de la organización."
-        stats={stats}
         filters={filters}
         tabsInTitle
+        headFiltersClassName="sales-head-filters"
         primaryActionLabel={primaryLabel}
         onPrimaryAction={primaryAction}
         canCreate={writable}
-        notice={
-          tab === "productos"
-            ? "Los productos pueden ser artículos con stock o servicios sin control de existencias."
-            : "Elegí el medio de pago al registrar cada venta. Solo las ventas confirmadas descuentan stock y generan un ingreso contable."
-        }
+        primaryActionClassName={tab === "ventas" ? "sales-create-top" : ""}
       >
         {tab === "productos" ? (
-          <div className="sales-tableWrap">
-            {loading ? <Empty loading /> : null}
-            {!loading && !catalogs.productos.length ? (
-              <Empty text="Agregá productos, artículos, entradas o servicios." />
-            ) : null}
-            {catalogs.productos.length ? (
-              <div className="sales-table sales-table--products" role="table">
-                <div className="sales-row sales-row--head" role="row">
-                  <span>Producto</span>
-                  <span>Precio</span>
-                  <span>Stock</span>
-                  <span>Estado</span>
-                  <span>Acciones</span>
-                </div>
-                {catalogs.productos.map((item) => (
+          <div className="sales-sectionBody">
+            <div className="sales-tableWrap">
+              <GlobalDivTable
+                ariaLabel="Listado de productos"
+                bodyClassName="entity-table-wrap"
+                className="sales-globalTable"
+                gridClassName="sales-grid sales-grid--products"
+                columns={["Producto", "Precio", "Stock", "Estado", "Acciones"]}
+              >
+                {loading && !catalogs.productos.length ? (
+                  <Empty loading />
+                ) : null}
+                {!loading && !catalogs.productos.length ? (
+                  <Empty text="Agregá productos, artículos, entradas o servicios." />
+                ) : null}
+                {!loading &&
+                catalogs.productos.length &&
+                !filteredProducts.length ? (
+                  <Empty text="No hay productos que coincidan con la búsqueda." />
+                ) : null}
+                {filteredProducts.map((item) => (
                   <div
-                    className={`sales-row ${item.stock_bajo ? "has-alert" : ""}`}
+                    className={`mov-gridTable mov-gridTable--row global-divTable__row entity-table-row sales-grid sales-grid--products ${item.stock_bajo ? "has-alert" : ""} ${item.activo ? "" : "is-inactive"}`.trim()}
                     role="row"
                     key={item.id_producto}
                   >
-                    <div>
+                    <div className="mov-gridCell entity-main-cell">
                       <strong>{item.nombre}</strong>
                       <small>
                         {item.codigo || "SIN CÓDIGO"}
                         {item.descripcion ? ` · ${item.descripcion}` : ""}
                       </small>
                     </div>
-                    <strong>{money(item.precio)}</strong>
-                    <div>
-                      <strong>
-                        {item.controla_stock
-                          ? number(item.stock_actual)
-                          : "SIN CONTROL"}
-                      </strong>
-                      {item.stock_bajo ? (
-                        <small className="sales-warning">
-                          Stock mínimo: {number(item.stock_minimo)}
-                        </small>
-                      ) : null}
+                    <div className="mov-gridCell is-right is-strong">
+                      {money(item.precio)}
                     </div>
-                    <StatusBadge state={item.activo ? "ACTIVO" : "INACTIVO"} />
-                    <div className="sales-actions">
-                      {writable ? (
-                        <ActionButton
-                          icon={faPen}
-                          label="Editar"
-                          onClick={() => editProduct(item)}
-                        />
-                      ) : null}
-                      {writable ? (
-                        <ActionButton
-                          icon={item.activo ? faToggleOff : faToggleOn}
-                          label={item.activo ? "Desactivar" : "Reactivar"}
-                          tone={item.activo ? "danger" : "success"}
-                          onClick={() => toggleProduct(item)}
-                        />
-                      ) : null}
+                    <div className="mov-gridCell is-center">
+                      <span className="sales-cellStack">
+                        <strong>
+                          {item.controla_stock
+                            ? number(item.stock_actual)
+                            : "SIN CONTROL"}
+                        </strong>
+                        {item.stock_bajo ? (
+                          <small className="sales-warning">
+                            Stock mínimo: {number(item.stock_minimo)}
+                          </small>
+                        ) : null}
+                      </span>
+                    </div>
+                    <div className="mov-gridCell is-center">
+                      <StatusBadge
+                        state={item.activo ? "ACTIVO" : "INACTIVO"}
+                      />
+                    </div>
+                    <div className="mov-gridCell mov-gridCell--actions">
+                      <div className="mov-actionsInline">
+                        {writable ? (
+                          <button
+                            type="button"
+                            className="mov-iconBtn"
+                            onClick={() => editProduct(item)}
+                            title="Editar"
+                            aria-label="Editar"
+                          >
+                            <FontAwesomeIcon icon={faPen} />
+                          </button>
+                        ) : null}
+                        {writable ? (
+                          <button
+                            type="button"
+                            className={`mov-iconBtn ${item.activo ? "mov-iconBtn--danger" : ""}`.trim()}
+                            onClick={() => toggleProduct(item)}
+                            title={item.activo ? "Desactivar" : "Reactivar"}
+                            aria-label={
+                              item.activo ? "Desactivar" : "Reactivar"
+                            }
+                          >
+                            <FontAwesomeIcon
+                              icon={item.activo ? faToggleOff : faToggleOn}
+                            />
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 ))}
-              </div>
-            ) : null}
+              </GlobalDivTable>
+            </div>
+            <div className="sales-tableFooter">
+              <SalesSummary stats={stats} />
+            </div>
           </div>
         ) : null}
 
         {tab === "ventas" ? (
-          <div className="sales-tableWrap">
-            <div className="sales-listSummary">
-              <span>{salesSummary.registros || 0} registros visibles</span>
-              <strong>Total confirmado: {money(salesSummary.total)}</strong>
-            </div>
-            {loading ? <Empty loading /> : null}
-            {!loading && !sales.length ? (
-              <Empty text="No hay ventas para los filtros seleccionados." />
-            ) : null}
-            {sales.length ? (
-              <div className="sales-table sales-table--sales" role="table">
-                <div className="sales-row sales-row--head" role="row">
-                  <span>Venta</span>
-                  <span>Comprador</span>
-                  <span>Productos</span>
-                  <span>Cobro</span>
-                  <span>Total</span>
-                  <span>Estado</span>
-                  <span>Acciones</span>
-                </div>
+          <div className="sales-sectionBody">
+            <div className="sales-tableWrap">
+              <GlobalDivTable
+                ariaLabel="Listado de ventas registradas"
+                bodyClassName="entity-table-wrap"
+                className="sales-globalTable"
+                gridClassName="sales-grid sales-grid--sales"
+                columns={[
+                  "Venta",
+                  "Comprador",
+                  "Productos",
+                  "Cobro",
+                  "Total",
+                  "Estado",
+                  "Acciones",
+                ]}
+              >
+                {loading && !sales.length ? <Empty loading /> : null}
+                {!loading && !sales.length ? (
+                  <Empty text="No hay ventas para los filtros seleccionados." />
+                ) : null}
                 {sales.map((item) => (
-                  <div className="sales-row" role="row" key={item.id_venta}>
-                    <div>
+                  <div
+                    className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row sales-grid sales-grid--sales"
+                    role="row"
+                    key={item.id_venta}
+                  >
+                    <div className="mov-gridCell entity-main-cell">
                       <strong>{item.codigo}</strong>
                       <small>
                         {formatDate(item.fecha)} · {item.configuracion_nombre}
                       </small>
                     </div>
-                    <div>
+                    <div className="mov-gridCell entity-main-cell">
                       <strong>
                         {item.comprador_nombre_snapshot || "VENTA ANÓNIMA"}
                       </strong>
@@ -638,7 +755,7 @@ export default function VentasModule() {
                           item.comprador_tipo}
                       </small>
                     </div>
-                    <div>
+                    <div className="mov-gridCell entity-main-cell">
                       <strong>{item.items.length} ítem(s)</strong>
                       <small>
                         {item.items
@@ -649,7 +766,7 @@ export default function VentasModule() {
                           .join(" · ")}
                       </small>
                     </div>
-                    <div>
+                    <div className="mov-gridCell entity-main-cell">
                       <strong>{item.medio_pago_nombre}</strong>
                       <small>
                         {item.id_ingreso_contable
@@ -657,58 +774,97 @@ export default function VentasModule() {
                           : "Sin asiento contable"}
                       </small>
                     </div>
-                    <strong>{money(item.total)}</strong>
-                    <StatusBadge state={item.estado} />
-                    <div className="sales-actions">
-                      {writable ? (
-                        <ActionButton
-                          icon={faPen}
-                          label="Editar"
-                          onClick={() => editSale(item)}
-                        />
-                      ) : null}
-                      {writable && item.estado !== "CONFIRMADA" ? (
-                        <ActionButton
-                          icon={faCheck}
-                          label="Confirmar"
-                          tone="success"
-                          onClick={() => changeSaleState(item, "CONFIRMADA")}
-                        />
-                      ) : null}
-                      {writable && item.estado === "CONFIRMADA" ? (
-                        <ActionButton
-                          icon={faArrowRotateLeft}
-                          label="Pasar a pendiente"
-                          onClick={() => changeSaleState(item, "PENDIENTE")}
-                        />
-                      ) : null}
-                      {writable && item.estado !== "ANULADA" ? (
-                        <ActionButton
-                          icon={faBan}
-                          label="Dar de baja"
-                          tone="danger"
-                          onClick={() => setSaleAction({ type: "baja", item })}
-                        />
-                      ) : null}
-                      {writable ? (
-                        <ActionButton
-                          icon={faTrashCan}
-                          label="Eliminar"
-                          tone="danger"
-                          onClick={() =>
-                            setSaleAction({ type: "eliminar", item })
-                          }
-                        />
-                      ) : null}
+                    <div className="mov-gridCell is-right is-strong">
+                      {money(item.total)}
+                    </div>
+                    <div className="mov-gridCell is-center">
+                      <StatusBadge state={item.estado} />
+                    </div>
+                    <div className="mov-gridCell mov-gridCell--actions">
+                      <div className="mov-actionsInline">
+                        {writable ? (
+                          <button
+                            type="button"
+                            className="mov-iconBtn"
+                            onClick={() => editSale(item)}
+                            title="Editar"
+                            aria-label="Editar"
+                          >
+                            <FontAwesomeIcon icon={faPen} />
+                          </button>
+                        ) : null}
+                        {writable && item.estado !== "CONFIRMADA" ? (
+                          <button
+                            type="button"
+                            className="mov-iconBtn"
+                            onClick={() => changeSaleState(item, "CONFIRMADA")}
+                            title="Confirmar"
+                            aria-label="Confirmar"
+                          >
+                            <FontAwesomeIcon icon={faCheck} />
+                          </button>
+                        ) : null}
+                        {writable && item.estado === "CONFIRMADA" ? (
+                          <button
+                            type="button"
+                            className="mov-iconBtn"
+                            onClick={() => changeSaleState(item, "PENDIENTE")}
+                            title="Pasar a pendiente"
+                            aria-label="Pasar a pendiente"
+                          >
+                            <FontAwesomeIcon icon={faArrowRotateLeft} />
+                          </button>
+                        ) : null}
+                        {writable && item.estado !== "ANULADA" ? (
+                          <button
+                            type="button"
+                            className="mov-iconBtn mov-iconBtn--danger"
+                            onClick={() =>
+                              setSaleAction({ type: "baja", item })
+                            }
+                            title="Dar de baja"
+                            aria-label="Dar de baja"
+                          >
+                            <FontAwesomeIcon icon={faBan} />
+                          </button>
+                        ) : null}
+                        {writable ? (
+                          <button
+                            type="button"
+                            className="mov-iconBtn mov-iconBtn--danger"
+                            onClick={() =>
+                              setSaleAction({ type: "eliminar", item })
+                            }
+                            title="Eliminar"
+                            aria-label="Eliminar"
+                          >
+                            <FontAwesomeIcon icon={faTrashCan} />
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
                 ))}
+              </GlobalDivTable>
+            </div>
+            <div className="sales-tableFooter">
+              <SalesSummary stats={registeredSalesStats} />
+              <div className="sales-lower-actions">
+                {writable ? (
+                  <button
+                    type="button"
+                    className="mov-btn mov-btn--primary"
+                    onClick={openNewSale}
+                  >
+                    <FontAwesomeIcon icon={faPlus} />
+                    Registrar venta
+                  </button>
+                ) : null}
               </div>
-            ) : null}
+            </div>
           </div>
         ) : null}
       </ModulePage>
-
 
       <ProductoVentaModal
         form={productForm}
@@ -735,6 +891,37 @@ export default function VentasModule() {
       />
 
       <ModalEliminarGlobal
+        open={Boolean(productAction)}
+        operacion="baja"
+        icon={faToggleOff}
+        row={productAction}
+        onClose={() => setProductAction(null)}
+        onConfirm={confirmProductDeactivation}
+        title="Desactivar producto"
+        message="El producto dejará de estar disponible para nuevas ventas, pero conservará su información y movimientos anteriores."
+        warning="Podrás reactivarlo desde esta misma tabla cuando lo necesites."
+        confirmLabel="Desactivar"
+        loadingLabel="Desactivando..."
+        loadingMessage="Desactivando producto…"
+        successMessage="Producto desactivado correctamente."
+        errorMessage="No se pudo desactivar el producto."
+        details={[
+          { label: "Producto", value: productAction?.nombre },
+          { label: "Código", value: productAction?.codigo || "SIN CÓDIGO" },
+          {
+            label: "Stock",
+            value: productAction?.controla_stock
+              ? number(productAction?.stock_actual)
+              : "SIN CONTROL",
+          },
+          {
+            label: "Estado",
+            value: productAction?.activo ? "ACTIVO" : "INACTIVO",
+          },
+        ]}
+      />
+
+      <ModalEliminarGlobal
         open={Boolean(saleAction)}
         operacion={saleAction?.type === "baja" ? "baja" : "eliminar"}
         icon={saleAction?.type === "baja" ? faBan : faTrashCan}
@@ -742,9 +929,7 @@ export default function VentasModule() {
         onClose={() => setSaleAction(null)}
         onConfirm={confirmSaleAction}
         title={
-          saleAction?.type === "baja"
-            ? "Dar de baja venta"
-            : "Eliminar venta"
+          saleAction?.type === "baja" ? "Dar de baja venta" : "Eliminar venta"
         }
         message={
           saleAction?.type === "baja"
@@ -756,9 +941,7 @@ export default function VentasModule() {
             ? "Podrás volver a confirmarla más adelante si fuera necesario."
             : "Esta acción no se puede deshacer. La auditoría conservará el registro de la eliminación."
         }
-        confirmLabel={
-          saleAction?.type === "baja" ? "Dar de baja" : "Eliminar"
-        }
+        confirmLabel={saleAction?.type === "baja" ? "Dar de baja" : "Eliminar"}
         loadingMessage={
           saleAction?.type === "baja"
             ? "Dando de baja la venta…"
