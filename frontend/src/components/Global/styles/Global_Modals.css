@@ -515,3 +515,9 @@
     animation: none;
   }
 }
+
+/* Suaviza los cambios de alto producidos por pestañas y contenido dinámico. */
+.entity-modal.is-size-transitioning {
+  overflow: hidden !important;
+  will-change: height;
+}

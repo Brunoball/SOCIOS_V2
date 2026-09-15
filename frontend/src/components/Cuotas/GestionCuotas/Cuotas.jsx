@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faDollarSign,
   faFileExcel,
+  faInbox,
   faPrint,
   faReceipt,
   faTrashCan,
@@ -14,6 +15,7 @@ import {
   useCompactModuleActions,
 } from "../../Global/components/ModulePage";
 import CrudModal from "../../Global/components/CrudModal";
+import GlobalDivTable from "../../Global/components/GlobalDivTable";
 import ModalEliminarGlobal from "../../Global/components/ModalEliminarGlobal";
 import ModuleFeedback from "../../Global/components/ModuleFeedback";
 import { FloatingField } from "../../Global/components/TabbedForm";
@@ -1006,58 +1008,53 @@ export default function Cuotas() {
         />
 
         {tab === "deudores" ? (
-          <div
-            className="global-divTable cuotas-table"
-            role="table"
-            aria-label="Listado de cuotas adeudadas"
+          <GlobalDivTable
+            ariaLabel="Listado de cuotas adeudadas"
+            bodyClassName="entity-table-wrap"
+            className="cuotas-table"
+            columns={[
+              "Socio",
+              "Familia",
+              "Categoría",
+              "Desde",
+              "Cuotas",
+              "Monto base",
+              "Descuento",
+              "Total",
+              "Acciones",
+            ]}
+            gridClassName="cuotas-debt-grid"
+            loading={loading}
+            loadingLabel="Calculando deudas..."
+            skeletonActionCount={1}
+            skeletonColumnTypes={[
+              "stacked",
+              "line",
+              "line",
+              "line",
+              "chip",
+              "line",
+              "chip",
+              "line",
+              "actions",
+            ]}
+            skeletonRows={8}
           >
-            <div
-              className="mov-tableWrap global-divTable__wrap entity-table-wrap"
-              role="rowgroup"
-            >
-              <div
-                className="mov-gridTable mov-gridTable--head global-divTable__head cuotas-debt-grid"
-                role="row"
-              >
-                {[
-                  "Socio",
-                  "Familia",
-                  "Categoría",
-                  "Desde",
-                  "Cuotas",
-                  "Monto base",
-                  "Descuento",
-                  "Total",
-                  "Acciones",
-                ].map((column) => (
-                  <div className="mov-gridCell--head" key={column}>
-                    {column}
-                  </div>
-                ))}
+            {!items.length ? (
+              <div className="module-empty">
+                <FontAwesomeIcon icon={faInbox} aria-hidden="true" />
+                <strong>Sin deudas para mostrar</strong>
+                <span>
+                  Todos los períodos visibles se encuentran pagos o condonados.
+                </span>
               </div>
-              {loading && !items.length ? (
-                <div className="module-empty">
-                  <strong>Calculando deudas...</strong>
-                  <span>
-                    Revisando desde la fecha de ingreso y los pagos registrados.
-                  </span>
-                </div>
-              ) : null}
-              {!loading && !items.length ? (
-                <div className="module-empty">
-                  <strong>Sin deudas para mostrar</strong>
-                  <span>
-                    Todos los períodos visibles se encuentran pagos o
-                    condonados.
-                  </span>
-                </div>
-              ) : null}
-              {items.map((item, index) => (
-                <div
-                  className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row cuotas-debt-grid"
-                  role="row"
-                  key={`deuda-${item.id_socio ?? item.socio ?? "socio"}-${item.id_categoria ?? item.categoria ?? "categoria"}-${item.primer_periodo?.anio ?? year}-${item.primer_periodo?.mes ?? month}-${index}`}
-                >
+            ) : null}
+            {items.map((item, index) => (
+              <div
+                className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row cuotas-debt-grid"
+                role="row"
+                key={`deuda-${item.id_socio ?? item.socio ?? "socio"}-${item.id_categoria ?? item.categoria ?? "categoria"}-${item.primer_periodo?.anio ?? year}-${item.primer_periodo?.mes ?? month}-${index}`}
+              >
                   <div className="mov-gridCell entity-main-cell">
                     <strong>{item.socio}</strong>
                     <small>DNI {item.dni}</small>
@@ -1107,65 +1104,62 @@ export default function Cuotas() {
                     ) : (
                       <span className="entity-readonly">CONSULTA</span>
                     )}
-                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div
-            className="global-divTable cuotas-table"
-            role="table"
-            aria-label={`Listado de cuotas ${tab}`}
-          >
-            <div
-              className="mov-tableWrap global-divTable__wrap entity-table-wrap"
-              role="rowgroup"
-            >
-              <div
-                className="mov-gridTable mov-gridTable--head global-divTable__head cuotas-operation-grid"
-                role="row"
-              >
-                {[
-                  "Socio",
-                  "Modalidad / períodos",
-                  "Categorías",
-                  "Fecha",
-                  "Medio de pago",
-                  "Monto base",
-                  "Descuento",
-                  tab === "condonados" ? "Cobrado" : "Total",
-                  "Acciones",
-                ].map((column) => (
-                  <div className="mov-gridCell--head" key={column}>
-                    {column}
-                  </div>
-                ))}
               </div>
-              {loading && !items.length ? (
-                <div className="module-empty">
-                  <strong>Cargando registros...</strong>
-                  <span>Consultando operaciones y comprobantes.</span>
-                </div>
-              ) : null}
-              {!loading && !items.length ? (
-                <div className="module-empty">
-                  <strong>Sin registros para mostrar</strong>
-                  <span>
-                    No hay operaciones en esta pestaña con los filtros
-                    seleccionados.
-                  </span>
-                </div>
-              ) : null}
-              {items.map((item, index) => (
-                <div
-                  className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row cuotas-operation-grid"
-                  role="row"
-                  key={
-                    item.fila_id ||
-                    `operacion-${item.tipo_registro ?? "registro"}-${item.id_operacion ?? item.codigo_operacion ?? item.id_socio ?? item.socio ?? "socio"}-${item.fecha_pago ?? "fecha"}-${index}`
-                  }
-                >
+            ))}
+          </GlobalDivTable>
+        ) : (
+          <GlobalDivTable
+            ariaLabel={`Listado de cuotas ${tab}`}
+            bodyClassName="entity-table-wrap"
+            className="cuotas-table"
+            columns={[
+              "Socio",
+              "Modalidad / períodos",
+              "Categorías",
+              "Fecha",
+              "Medio de pago",
+              "Monto base",
+              "Descuento",
+              tab === "condonados" ? "Cobrado" : "Total",
+              "Acciones",
+            ]}
+            gridClassName="cuotas-operation-grid"
+            loading={loading}
+            loadingLabel="Cargando registros..."
+            skeletonActionCount={writable ? 2 : 1}
+            skeletonColumnTypes={[
+              "stacked",
+              "stacked",
+              "line",
+              "line",
+              "line",
+              "line",
+              "line",
+              "line",
+              "actions",
+            ]}
+            skeletonRows={8}
+          >
+            {!items.length ? (
+              <div className="module-empty">
+                <FontAwesomeIcon icon={faInbox} aria-hidden="true" />
+                <strong>Sin registros para mostrar</strong>
+                <span>
+                  No hay operaciones en esta pestaña con los filtros
+                  seleccionados.
+                </span>
+              </div>
+            ) : null}
+            {items.map((item, index) => (
+              <div
+                className="mov-gridTable mov-gridTable--row global-divTable__row entity-table-row cuotas-operation-grid"
+                role="row"
+                key={
+                  item.fila_id ||
+                  `operacion-${item.tipo_registro ?? "registro"}-${item.id_operacion ?? item.codigo_operacion ?? item.id_socio ?? item.socio ?? "socio"}-${item.fecha_pago ?? "fecha"}-${index}`
+                }
+              >
                   <div className="mov-gridCell entity-main-cell">
                     <strong>{item.socio}</strong>
                     <small>DNI {item.dni}</small>
@@ -1213,11 +1207,10 @@ export default function Cuotas() {
                         </button>
                       ) : null}
                     </div>
-                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            ))}
+          </GlobalDivTable>
         )}
 
         <div

@@ -3,12 +3,11 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faArrowRotateLeft,
   faBan,
-  faCashRegister,
   faCheck,
   faCircleInfo,
+  faInbox,
   faPen,
   faPlus,
-  faReceipt,
   faToggleOff,
   faToggleOn,
   faTrashCan,
@@ -85,14 +84,12 @@ const emptySale = () => ({
   items: [{ id_producto: "", cantidad: "1", precio_unitario: "" }],
 });
 
-function Empty({ loading, text }) {
+function Empty({ text }) {
   return (
     <div className="module-empty">
-      <FontAwesomeIcon icon={loading ? faCashRegister : faReceipt} />
-      <strong>{loading ? "Cargando ventas..." : "No hay registros"}</strong>
-      <span>
-        {loading ? "Consultando la información de la organización." : text}
-      </span>
+      <FontAwesomeIcon icon={faInbox} aria-hidden="true" />
+      <strong>No hay registros</strong>
+      <span>{text}</span>
     </div>
   );
 }
@@ -626,10 +623,18 @@ export default function VentasModule() {
                 className="sales-globalTable"
                 gridClassName="sales-grid sales-grid--products"
                 columns={["Producto", "Precio", "Stock", "Estado", "Acciones"]}
+                loading={loading && !catalogs.productos.length}
+                loadingLabel="Cargando productos..."
+                skeletonActionCount={2}
+                skeletonColumnTypes={[
+                  "stacked",
+                  "line",
+                  "stacked",
+                  "chip",
+                  "actions",
+                ]}
+                skeletonRows={8}
               >
-                {loading && !catalogs.productos.length ? (
-                  <Empty loading />
-                ) : null}
                 {!loading && !catalogs.productos.length ? (
                   <Empty text="Agregá productos, artículos, entradas o servicios." />
                 ) : null}
@@ -730,8 +735,20 @@ export default function VentasModule() {
                   "Estado",
                   "Acciones",
                 ]}
+                loading={loading && !sales.length}
+                loadingLabel="Cargando ventas..."
+                skeletonActionCount={2}
+                skeletonColumnTypes={[
+                  "stacked",
+                  "stacked",
+                  "line",
+                  "line",
+                  "line",
+                  "chip",
+                  "actions",
+                ]}
+                skeletonRows={8}
               >
-                {loading && !sales.length ? <Empty loading /> : null}
                 {!loading && !sales.length ? (
                   <Empty text="No hay ventas para los filtros seleccionados." />
                 ) : null}

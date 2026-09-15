@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faAddressBook,
   faHouse,
+  faInbox,
   faPen,
   faRotateLeft,
   faToggleOff,
@@ -89,6 +90,8 @@ function FamilyForm({ form, setForm, partners, activeTab, onTabChange }) {
             active={Boolean(form.nombre)}
           >
             <input
+              name="nombre_familia"
+              data-field-type="text"
               value={form.nombre}
               onChange={(e) =>
                 setForm((current) => ({
@@ -107,6 +110,8 @@ function FamilyForm({ form, setForm, partners, activeTab, onTabChange }) {
             textarea
           >
             <textarea
+              name="descripcion_familia"
+              data-field-type="text"
               value={form.descripcion}
               onChange={(e) =>
                 setForm((current) => ({
@@ -142,6 +147,8 @@ function FamilyForm({ form, setForm, partners, activeTab, onTabChange }) {
             >
               <input
                 type="search"
+                name="buscar_integrante"
+                data-field-type="none"
                 value={memberSearch}
                 onChange={(e) => setMemberSearch(e.target.value)}
                 placeholder=" "
@@ -327,6 +334,18 @@ export default function Familias() {
           bodyClassName="entity-table-wrap"
           gridClassName="familias-grid"
           ariaLabel="Listado de familias"
+          loading={loading && !items.length}
+          loadingLabel="Cargando familias..."
+          skeletonRows={8}
+          skeletonActionCount={writable ? 2 : 1}
+          skeletonColumnTypes={[
+            "line",
+            "line",
+            "line",
+            "chip",
+            "chip",
+            "actions",
+          ]}
           columns={[
             "Familia",
             "Descripción",
@@ -336,14 +355,9 @@ export default function Familias() {
             "Acciones",
           ]}
         >
-          {loading && !items.length ? (
-            <div className="module-empty">
-              <strong>Cargando familias...</strong>
-              <span>Consultando los grupos de la organización.</span>
-            </div>
-          ) : null}
           {!loading && !error && !items.length ? (
             <div className="module-empty">
+              <FontAwesomeIcon icon={faInbox} aria-hidden="true" />
               <strong>Sin familias para mostrar</strong>
               <span>Creá la primera familia o cambiá los filtros.</span>
             </div>

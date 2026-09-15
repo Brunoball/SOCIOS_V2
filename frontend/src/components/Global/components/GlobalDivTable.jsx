@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import GlobalTableSkeleton from "./GlobalTableSkeleton";
 
 /**
  * Estructura global para tablas construidas con divs.
@@ -14,6 +15,11 @@ export default function GlobalDivTable({
   className = "",
   columns = [],
   gridClassName = "",
+  loading = false,
+  loadingLabel = "Cargando datos de la tabla...",
+  skeletonActionCount = 2,
+  skeletonColumnTypes = [],
+  skeletonRows = 8,
 }) {
   const bodyRef = useRef(null);
   const [scrollbarWidth, setScrollbarWidth] = useState(0);
@@ -59,6 +65,7 @@ export default function GlobalDivTable({
       className={`global-divTable ${scrollbarWidth ? "has-y-scroll" : ""} ${className}`.trim()}
       role="table"
       aria-label={ariaLabel}
+      aria-busy={loading}
       style={{ "--global-table-scrollbar-width": `${scrollbarWidth}px` }}
     >
       <div
@@ -80,7 +87,24 @@ export default function GlobalDivTable({
         className={`mov-tableWrap global-divTable__wrap global-divTable__body ${bodyClassName}`.trim()}
         role="rowgroup"
       >
-        {children}
+        {loading ? (
+          <>
+            <div className="global-table-skeleton__status" role="row">
+              <span role="cell" aria-live="polite">
+                {loadingLabel}
+              </span>
+            </div>
+            <GlobalTableSkeleton
+              actionCount={skeletonActionCount}
+              columns={columns}
+              columnTypes={skeletonColumnTypes}
+              gridClassName={gridClassName}
+              rows={skeletonRows}
+            />
+          </>
+        ) : (
+          children
+        )}
       </div>
     </div>
   );

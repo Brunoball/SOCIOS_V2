@@ -15,7 +15,13 @@ import {
   faUserSlash,
 } from "@fortawesome/free-solid-svg-icons";
 import Toast from "../Toast";
+import useAnimatedModalSize from "./useAnimatedModalSize";
 import "../styles/Global_ModalEliminar.css";
+import {
+  configureModalField,
+  configureModalFields,
+  restrictModalField,
+} from "../utils/modalFieldRules";
 
 const OPERATION_CONFIG = {
   eliminar: {
@@ -116,6 +122,9 @@ export default function ModalEliminarGlobal({
 }) {
   const cancelRef = useRef(null);
   const reasonRef = useRef(null);
+  const overlayRef = useRef(null);
+  const modalRef = useRef(null);
+  useAnimatedModalSize(modalRef, open);
   const [processing, setProcessing] = useState(false);
   const [reason, setReason] = useState(upper(initialReason));
   const [localToast, setLocalToast] = useState(null);
@@ -156,6 +165,16 @@ export default function ModalEliminarGlobal({
       document.body.style.overflow = previousOverflow;
     };
   }, [open, initialReason]);
+
+  useEffect(() => {
+    if (!open || !overlayRef.current) return undefined;
+    configureModalFields(overlayRef.current);
+    const observer = new MutationObserver(() => {
+      configureModalFields(overlayRef.current);
+    });
+    observer.observe(overlayRef.current, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [extraContent, open, showReason]);
 
   const showToast = useCallback(
     (tipo, mensaje, duracion = 2800) => {
@@ -243,6 +262,9 @@ export default function ModalEliminarGlobal({
     }, 0);
     const onKeyDown = (event) => {
       if (event.key === "Escape") {
+        const openModals = document.querySelectorAll("[data-global-modal-root]");
+        const topModal = openModals[openModals.length - 1];
+        if (topModal !== overlayRef.current) return;
         event.preventDefault();
         event.stopImmediatePropagation();
         close();
@@ -278,14 +300,22 @@ export default function ModalEliminarGlobal({
         />
       ) : null}
       <div
+        ref={overlayRef}
         className="gdel-overlay"
         role="dialog"
         aria-modal="true"
         aria-labelledby="gdel-title"
+        data-global-modal-root
         onMouseDown={(event) => event.stopPropagation()}
         onClick={(event) => event.stopPropagation()}
+        onFocusCapture={(event) => configureModalField(event.target)}
+        onChangeCapture={restrictModalField}
+        onCompositionEndCapture={restrictModalField}
       >
-        <div className={`gdel-modal gdel-modal--${resolvedTone}`}>
+        <div
+          ref={modalRef}
+          className={`gdel-modal gdel-modal--${resolvedTone}`}
+        >
           <button
             type="button"
             className="gdel-close"

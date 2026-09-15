@@ -4,6 +4,7 @@ import {
   faCalendarDays,
   faCheckCircle,
   faClockRotateLeft,
+  faInbox,
   faPen,
   faRotateLeft,
   faTags,
@@ -506,6 +507,7 @@ export default function CategoriasModule({ section = "categorias" }) {
               ) : null}
               {!loading && !error && !items.length ? (
                 <div className="module-empty">
+                  <FontAwesomeIcon icon={faInbox} aria-hidden="true" />
                   <strong>Sin categorías para mostrar</strong>
                   <span>Creá la primera categoría o cambiá los filtros.</span>
                 </div>
@@ -610,6 +612,7 @@ export default function CategoriasModule({ section = "categorias" }) {
               ) : null}
               {!discountsLoading && !discountsError && !discounts.length ? (
                 <div className="module-empty">
+                  <FontAwesomeIcon icon={faInbox} aria-hidden="true" />
                   <strong>Sin descuentos configurados</strong>
                   <span>
                     Si no agregás reglas, no se aplicará descuento familiar.

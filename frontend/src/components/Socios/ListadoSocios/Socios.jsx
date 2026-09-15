@@ -8,6 +8,7 @@ import {
   faClockRotateLeft,
   faHouse,
   faIdCard,
+  faInbox,
   faPen,
   faReceipt,
   faRotateLeft,
@@ -149,6 +150,8 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
         >
           <FloatingField label="Apellido *" active={Boolean(form.apellido)}>
             <input
+              name="apellido"
+              data-field-type="person-name"
               value={form.apellido}
               placeholder=" "
               onChange={(e) => update("apellido", upper(e.target.value))}
@@ -158,6 +161,8 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
           </FloatingField>
           <FloatingField label="Nombre *" active={Boolean(form.nombre)}>
             <input
+              name="nombre"
+              data-field-type="person-name"
               value={form.nombre}
               placeholder=" "
               onChange={(e) => update("nombre", upper(e.target.value))}
@@ -166,6 +171,8 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
           </FloatingField>
           <FloatingField label="DNI *" active={Boolean(form.dni)}>
             <input
+              name="dni"
+              data-field-type="dni"
               value={form.dni}
               placeholder=" "
               onChange={(e) => update("dni", e.target.value.replace(/\D/g, ""))}
@@ -175,6 +182,7 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
           </FloatingField>
           <FloatingField label="Fecha de nacimiento" active>
             <input
+              name="fecha_nacimiento"
               type="date"
               value={form.fecha_nacimiento}
               max={dateToday()}
@@ -184,6 +192,7 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
           </FloatingField>
           <FloatingField label="Sexo" active>
             <select
+              name="sexo"
               value={form.sexo}
               onChange={(e) => update("sexo", e.target.value)}
             >
@@ -195,6 +204,7 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
           </FloatingField>
           <FloatingField label="Fecha de ingreso *" active>
             <input
+              name="fecha_ingreso"
               type="date"
               value={form.fecha_ingreso}
               max={dateToday()}
@@ -224,6 +234,8 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
               wide
             >
               <input
+                name="domicilio"
+                data-field-type="text"
                 value={form.domicilio}
                 placeholder=" "
                 onChange={(e) => update("domicilio", upper(e.target.value))}
@@ -232,6 +244,7 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
             </FloatingField>
             <FloatingField label="Localidad *" active>
               <select
+                name="id_localidad"
                 value={form.id_localidad}
                 onChange={(e) => update("id_localidad", e.target.value)}
               >
@@ -249,6 +262,8 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
                 active={Boolean(form.localidad_nueva)}
               >
                 <input
+                  name="localidad_nueva"
+                  data-field-type="text"
                   value={form.localidad_nueva}
                   placeholder=" "
                   onChange={(e) =>
@@ -260,6 +275,8 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
             ) : (
               <FloatingField label="Teléfono" active={Boolean(form.telefono)}>
                 <input
+                  name="telefono"
+                  data-field-type="phone"
                   value={form.telefono}
                   placeholder=" "
                   onChange={(e) => update("telefono", e.target.value)}
@@ -271,6 +288,8 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
             {form.id_localidad === "__new__" ? (
               <FloatingField label="Teléfono" active={Boolean(form.telefono)}>
                 <input
+                  name="telefono"
+                  data-field-type="phone"
                   value={form.telefono}
                   placeholder=" "
                   onChange={(e) => update("telefono", e.target.value)}
@@ -285,7 +304,9 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
               wide={form.id_localidad !== "__new__"}
             >
               <input
-                type="text"
+                name="email"
+                type="email"
+                data-field-type="email"
                 inputMode="email"
                 value={form.email}
                 placeholder=" "
@@ -300,6 +321,8 @@ function SocioForm({ form, setForm, catalogos, activeTab, onTabChange }) {
               wide
             >
               <textarea
+                name="observaciones"
+                data-field-type="text"
                 value={form.observaciones}
                 placeholder=" "
                 onChange={(e) => update("observaciones", upper(e.target.value))}
@@ -571,6 +594,20 @@ export default function Socios() {
           bodyClassName="entity-table-wrap"
           gridClassName="socios-grid"
           ariaLabel="Listado de socios"
+          loading={loading && !items.length}
+          loadingLabel="Cargando socios..."
+          skeletonRows={8}
+          skeletonActionCount={writable ? 3 : 1}
+          skeletonColumnTypes={[
+            "stacked",
+            "line",
+            "line",
+            "line",
+            "stacked",
+            "line",
+            "chip",
+            "actions",
+          ]}
           columns={[
             "Socio",
             "DNI",
@@ -582,14 +619,9 @@ export default function Socios() {
             "Acciones",
           ]}
         >
-          {loading && !items.length ? (
-            <div className="module-empty">
-              <strong>Cargando socios...</strong>
-              <span>Consultando el padrón de la organización.</span>
-            </div>
-          ) : null}
           {!loading && !error && !items.length ? (
             <div className="module-empty">
+              <FontAwesomeIcon icon={faInbox} aria-hidden="true" />
               <strong>Sin socios para mostrar</strong>
               <span>Creá el primer socio o cambiá los filtros aplicados.</span>
             </div>

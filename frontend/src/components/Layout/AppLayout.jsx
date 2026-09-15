@@ -22,6 +22,7 @@ import {
   openAuthenticatedTab,
 } from "../Global/auth/session";
 import { apiPost } from "../Global/api/apiClient";
+import ModalPerfil from "../Perfil/ModalPerfil";
 import { BOT_PANEL_ROUTE } from "../../config/config";
 import "./AppLayout.css";
 
@@ -149,6 +150,7 @@ export default function AppLayout() {
   const navigate = useNavigate();
   const session = getSession();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [perfilOpen, setPerfilOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [openGroupKey, setOpenGroupKey] = useState(() =>
     getGroupKeyForPath(location.pathname),
@@ -271,7 +273,11 @@ export default function AppLayout() {
           <button
             className="mov-topbar__usericon"
             type="button"
-            title={`${session?.usuario?.nombre || "Usuario"} · ${session?.usuario?.rol || ""}`}
+            onClick={() => setPerfilOpen(true)}
+            title="Perfil"
+            aria-label="Abrir perfil"
+            aria-haspopup="dialog"
+            aria-expanded={perfilOpen}
           >
             <FontAwesomeIcon icon={faUserCircle} />
           </button>
@@ -417,6 +423,15 @@ export default function AppLayout() {
           <Outlet />
         </div>
       </main>
+      <ModalPerfil
+        open={perfilOpen}
+        onClose={() => setPerfilOpen(false)}
+        usuario={session?.usuario}
+        onConfigRequest={() => {
+          setPerfilOpen(false);
+          navigate("/configuracion");
+        }}
+      />
       <LogoutModal
         open={logoutOpen}
         onClose={() => setLogoutOpen(false)}

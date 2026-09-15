@@ -10,9 +10,13 @@ import {
   faArrowTrendDown,
   faArrowTrendUp,
   faChartPie,
+  faCircleInfo,
   faEye,
   faFileExcel,
   faFileInvoiceDollar,
+  faInbox,
+  faList,
+  faMoneyBillTransfer,
   faPaperclip,
   faPen,
   faPlus,
@@ -33,6 +37,7 @@ import {
 } from "../../Global/components/TabbedForm";
 import { canWrite } from "../../Global/auth/session";
 import { contableApi } from "../api/contableApi";
+import SummaryCards from "./SummaryCards";
 import "./Contable.css";
 
 const now = new Date();
@@ -186,34 +191,171 @@ function OptionSelect({
   );
 }
 
-function EmptyState({ loading, message = "No hay registros para mostrar." }) {
+function EmptyState({ message = "No hay registros para mostrar." }) {
   return (
     <div className="module-empty">
-      <strong>
-        {loading
-          ? "Cargando información contable..."
-          : "Sin movimientos para mostrar"}
-      </strong>
-      <span>
-        {loading
-          ? "Consultando los movimientos del período seleccionado."
-          : message}
-      </span>
+      <FontAwesomeIcon icon={faInbox} aria-hidden="true" />
+      <strong>Sin movimientos para mostrar</strong>
+      <span>{message}</span>
     </div>
   );
 }
 
-function SummaryView({ summary, loading, mode }) {
+function monthlyRows(summary) {
+  const source = Array.isArray(summary?.meses) ? summary.meses : [];
+
+  return MONTHS.map((name, index) => {
+    const monthNumber = index + 1;
+    const item = source.find(
+      (candidate) => Number(candidate.mes) === monthNumber,
+    );
+    const income = Number(item?.ingresos || 0);
+    const expenses = Number(item?.egresos || 0);
+
+    return {
+      mes: monthNumber,
+      nombre: item?.nombre || name,
+      ingresos: income,
+      egresos: expenses,
+      resultado: Number(item?.resultado ?? income - expenses),
+    };
+  });
+}
+
+function MonthlyBarChart({ months = [] }) {
+  const values = months.flatMap((item) => [item.ingresos, item.egresos]);
+  const maxValue = Math.max(0, ...values);
+  const scaleMax = Math.max(1, maxValue);
+  const scaleSteps = [1, 0.75, 0.5, 0.25, 0];
+  const compactMoney = (value) =>
+    new Intl.NumberFormat("es-AR", {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(Number(value || 0));
+  const barHeight = (value) => {
+    const numericValue = Number(value || 0);
+    if (numericValue <= 0) return "0%";
+    return `${Math.max(3, (numericValue / scaleMax) * 100)}%`;
+  };
+
+  return (
+    <article className="ct-panel ct-month-chart-panel">
+      <header>
+        <FontAwesomeIcon icon={faFileInvoiceDollar} /> Movimientos por mes
+      </header>
+
+      <div className="ct-month-chart">
+        <div
+          className="ct-month-chart__legend"
+          aria-label="Referencias del gráfico"
+        >
+          <span>
+            <i className="is-income" /> Ingresos
+          </span>
+          <span>
+            <i className="is-expense" /> Egresos
+          </span>
+        </div>
+
+        <div
+          className="ct-month-chart__plot"
+          role="group"
+          aria-label="Gráfico de barras de ingresos y egresos por mes"
+        >
+          <div className="ct-month-chart__scale" aria-hidden="true">
+            {scaleSteps.map((step) => (
+              <span key={step}>
+                {compactMoney(maxValue > 0 ? maxValue * step : 0)}
+              </span>
+            ))}
+          </div>
+
+          <div className="ct-month-chart__canvas">
+            <div className="ct-month-chart__grid" aria-hidden="true">
+              {scaleSteps.map((step) => (
+                <i key={step} />
+              ))}
+            </div>
+
+            <div className="ct-month-chart__months">
+              {months.map((item) => (
+                <div
+                  className="ct-month-chart__month"
+                  key={item.mes}
+                  tabIndex={0}
+                  aria-label={`${item.nombre}: ingresos ${money(item.ingresos)}, egresos ${money(item.egresos)}, resultado ${money(item.resultado)}`}
+                >
+                  <div className="ct-month-chart__bars" aria-hidden="true">
+                    <span
+                      className="ct-month-chart__bar is-income"
+                      style={{ height: barHeight(item.ingresos) }}
+                    />
+                    <span
+                      className="ct-month-chart__bar is-expense"
+                      style={{ height: barHeight(item.egresos) }}
+                    />
+                  </div>
+                  <strong>{item.nombre.slice(0, 3)}</strong>
+                  <div className="ct-month-chart__tooltip" aria-hidden="true">
+                    <b>{item.nombre}</b>
+                    <span>
+                      Ingresos <strong>{money(item.ingresos)}</strong>
+                    </span>
+                    <span>
+                      Egresos <strong>{money(item.egresos)}</strong>
+                    </span>
+                    <span
+                      className={
+                        item.resultado >= 0 ? "ct-positive" : "ct-negative"
+                      }
+                    >
+                      Resultado <strong>{money(item.resultado)}</strong>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function SummaryView({ summary, loading, mode, month, year }) {
   const totals = summary?.totales || {};
-  const income = Number(totals.ingresos || 0);
-  const expenses = Number(totals.egresos || 0);
+  const months = monthlyRows(summary);
+  const selectedMonthNumber = Number(summary?.mes_seleccionado || month);
+  const selectedMonth = months.find(
+    (item) => item.mes === selectedMonthNumber,
+  );
+  const visibleTotals =
+    mode === "monthly" ? summary?.totales_mes || selectedMonth || {} : totals;
+  const income = Number(visibleTotals.ingresos || 0);
+  const expenses = Number(visibleTotals.egresos || 0);
+  const result = Number(visibleTotals.resultado ?? income - expenses);
+  const partnerIncome = Number(visibleTotals.ingresos_socios || 0);
+  const otherIncome = Number(visibleTotals.otros_ingresos || 0);
+  const hasIncomeBreakdown =
+    Object.prototype.hasOwnProperty.call(visibleTotals, "ingresos_socios") ||
+    Object.prototype.hasOwnProperty.call(visibleTotals, "otros_ingresos");
   const sum = income + expenses;
   const incomeDegrees = sum > 0 ? (income / sum) * 360 : 0;
   const detail = summary?.detalle_mes || {};
+  const periodLabel =
+    mode === "monthly"
+      ? selectedMonth?.nombre || "Mes seleccionado"
+      : `Año ${summary?.anio || year}`;
 
   return (
     <section className={`ct-summary ct-summary--${mode}`}>
-      {loading ? <EmptyState loading /> : null}
+      {loading ? (
+        <div className="module-empty">
+          <FontAwesomeIcon icon={faMoneyBillTransfer} />
+          <strong>Cargando información contable...</strong>
+          <span>Consultando los movimientos del período seleccionado.</span>
+        </div>
+      ) : null}
 
       {!loading && mode === "annual" ? (
         <div className="ct-summary__annual">
@@ -229,7 +371,7 @@ function SummaryView({ summary, loading, mode }) {
                 }}
               >
                 <div>
-                  <strong>{money(income - expenses)}</strong>
+                  <strong>{money(result)}</strong>
                   <span>Resultado</span>
                 </div>
               </div>
@@ -244,56 +386,7 @@ function SummaryView({ summary, loading, mode }) {
             </div>
           </article>
 
-          <article className="ct-panel ct-month-table-panel">
-            <header>
-              <FontAwesomeIcon icon={faFileInvoiceDollar} /> Resumen anual
-            </header>
-            <div
-              className="ct-annual-table"
-              role="table"
-              aria-label="Resumen anual por mes"
-            >
-              <div
-                className="mov-gridTable mov-gridTable--head ct-annual-table__head ct-annual-grid"
-                role="row"
-              >
-                {["Mes", "Ingresos", "Egresos", "Resultado"].map((column) => (
-                  <div
-                    className="mov-gridCell--head"
-                    role="columnheader"
-                    key={column}
-                  >
-                    {column}
-                  </div>
-                ))}
-              </div>
-              <div className="ct-annual-table__body" role="rowgroup">
-                {(summary?.meses || []).map((item) => (
-                  <div
-                    className="mov-gridTable mov-gridTable--row ct-annual-grid"
-                    role="row"
-                    key={item.mes}
-                  >
-                    <div className="mov-gridCell is-strong" role="cell">
-                      {item.nombre}
-                    </div>
-                    <div className="mov-gridCell is-right" role="cell">
-                      {money(item.ingresos)}
-                    </div>
-                    <div className="mov-gridCell is-right" role="cell">
-                      {money(item.egresos)}
-                    </div>
-                    <div
-                      className={`mov-gridCell is-right ${Number(item.resultado) >= 0 ? "ct-positive" : "ct-negative"}`}
-                      role="cell"
-                    >
-                      {money(item.resultado)}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </article>
+          <MonthlyBarChart months={months} />
         </div>
       ) : null}
 
@@ -311,6 +404,39 @@ function SummaryView({ summary, loading, mode }) {
             <Breakdown title="Medios de cobro" items={detail.medios} />
           </div>
         </div>
+      ) : null}
+
+      {!loading ? (
+        <SummaryCards
+          title="Resumen del período"
+          ariaLabel="Totales del período"
+          className={result >= 0 ? "is-positive" : "is-negative"}
+          items={[
+            {
+              key: "income",
+              label: "Ingresos",
+              detail: hasIncomeBreakdown
+                ? `Cuotas ${money(partnerIncome)} · Otros ${money(otherIncome)}`
+                : `Ingresos registrados · ${periodLabel}`,
+              value: money(income),
+              tone: "success",
+            },
+            {
+              key: "expenses",
+              label: "Egresos",
+              detail: `Gastos registrados · ${periodLabel}`,
+              value: money(expenses),
+              tone: "danger",
+            },
+            {
+              key: "result",
+              label: "Resultado",
+              detail: periodLabel,
+              value: money(result),
+              tone: result >= 0 ? "balance" : "danger",
+            },
+          ]}
+        />
       ) : null}
     </section>
   );
@@ -336,6 +462,112 @@ function Breakdown({ title, items = [] }) {
   );
 }
 
+function SummaryDetailModal({ open, onClose, summary, year, month }) {
+  const rows = monthlyRows(summary);
+  const calculatedTotals = rows.reduce(
+    (accumulator, item) => ({
+      ingresos: accumulator.ingresos + item.ingresos,
+      egresos: accumulator.egresos + item.egresos,
+      resultado: accumulator.resultado + item.resultado,
+    }),
+    { ingresos: 0, egresos: 0, resultado: 0 },
+  );
+  const totals = {
+    ingresos: Number(summary?.totales?.ingresos ?? calculatedTotals.ingresos),
+    egresos: Number(summary?.totales?.egresos ?? calculatedTotals.egresos),
+    resultado: Number(
+      summary?.totales?.resultado ?? calculatedTotals.resultado,
+    ),
+  };
+  const selectedMonth = Number(summary?.mes_seleccionado || month);
+
+  return (
+    <CrudModal
+      open={open}
+      title="Detalle mensual contable"
+      subtitle={`Ingresos, egresos y resultado de cada mes del año ${year}.`}
+      onClose={onClose}
+      hideSubmit
+      hideCancel
+      modalClassName="contable-summary-detail-modal"
+      wide
+    >
+      <SummaryCards
+        title=""
+        ariaLabel={`Totales contables del año ${year}`}
+        variant="dashboard"
+        className="contable-summary-detail-cards"
+        items={[
+          {
+            key: "detail-income",
+            icon: faArrowTrendUp,
+            label: "Ingresos",
+            value: money(totals.ingresos),
+            detail: `Acumulado del año ${year}`,
+            tone: "success",
+          },
+          {
+            key: "detail-expenses",
+            icon: faArrowTrendDown,
+            label: "Egresos",
+            value: money(totals.egresos),
+            detail: `Acumulado del año ${year}`,
+            tone: "danger",
+          },
+          {
+            key: "detail-result",
+            icon: faMoneyBillTransfer,
+            label: "Resultado",
+            value: money(totals.resultado),
+            detail:
+              totals.resultado >= 0 ? "Balance positivo" : "Balance negativo",
+            tone: totals.resultado >= 0 ? "balance" : "danger",
+          },
+        ]}
+      />
+
+      <GlobalDivTable
+        className="contable-summary-detail-table"
+        bodyClassName="contable-summary-detail-table__body"
+        gridClassName="contable-summary-detail-grid"
+        columns={["Mes", "Ingresos", "Egresos", "Resultado"]}
+        ariaLabel={`Detalle mensual contable del año ${year}`}
+      >
+        {rows.map((item) => (
+          <div
+            className={`mov-gridTable mov-gridTable--row global-divTable__row entity-table-row contable-summary-detail-grid ${selectedMonth === item.mes ? "is-selected-month" : ""}`.trim()}
+            role="row"
+            key={item.mes}
+          >
+            <div className="mov-gridCell entity-main-cell" role="cell">
+              <strong>{item.nombre}</strong>
+              <small>{year}</small>
+            </div>
+            <div
+              className="mov-gridCell is-right contable-summary-money--income"
+              role="cell"
+            >
+              {money(item.ingresos)}
+            </div>
+            <div
+              className="mov-gridCell is-right contable-summary-money--expense"
+              role="cell"
+            >
+              {money(item.egresos)}
+            </div>
+            <div
+              className={`mov-gridCell is-right is-strong ${item.resultado >= 0 ? "ct-positive" : "ct-negative"}`}
+              role="cell"
+            >
+              {money(item.resultado)}
+            </div>
+          </div>
+        ))}
+      </GlobalDivTable>
+    </CrudModal>
+  );
+}
+
 export default function ContableModule({ view = "summary" }) {
   const compactActions = useCompactModuleActions();
   const writable = canWrite();
@@ -344,6 +576,7 @@ export default function ContableModule({ view = "summary" }) {
   const [year, setYear] = useState(String(CURRENT_YEAR));
   const [month, setMonth] = useState(String(CURRENT_MONTH));
   const [summaryMode, setSummaryMode] = useState("annual");
+  const [summaryDetailOpen, setSummaryDetailOpen] = useState(false);
   const [incomeTab, setIncomeTab] = useState("partners");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -768,7 +1001,8 @@ export default function ContableModule({ view = "summary" }) {
               { value: "monthly", label: "Mensual" },
             ],
           },
-          ...periodFilters,
+          periodFilters[0],
+          ...(summaryMode === "monthly" ? [periodFilters[1]] : []),
         ]
       : view === "income"
         ? [
@@ -831,13 +1065,51 @@ export default function ContableModule({ view = "summary" }) {
       : view === "income"
         ? `contable-grid ${writable ? "contable-grid--income" : "contable-grid--income-readonly"}`
         : "contable-grid contable-grid--expense";
+  const selectedSummaryMonth = monthlyRows(summary).find(
+    (item) => item.mes === Number(summary?.mes_seleccionado || month),
+  );
+  const summaryVisibleTotals =
+    summaryMode === "monthly"
+      ? summary?.totales_mes || selectedSummaryMonth || {}
+      : summary?.totales || {};
+  const summaryEstimatedPayments = Number(
+    summaryVisibleTotals.pagos_estimados || 0,
+  );
+  const summaryEstimateMessage = `${summaryEstimatedPayments} cobro${
+    summaryEstimatedPayments === 1
+      ? " histórico tiene"
+      : "s históricos tienen"
+  } el importe estimado según la cuota de su categoría porque la base anterior no guardó el monto exacto.`;
 
   return (
     <>
       <ModulePage
         title={
           view === "summary"
-            ? "Resumen contable"
+            ? (
+                <span className="ct-page-title">
+                  <span>Resumen contable</span>
+                  {!loading && summaryEstimatedPayments > 0 ? (
+                    <span className="ct-estimate-help">
+                      <button
+                        className="ct-estimate-help__button"
+                        type="button"
+                        aria-label={summaryEstimateMessage}
+                        aria-describedby="ct-estimate-tooltip"
+                      >
+                        <FontAwesomeIcon icon={faCircleInfo} />
+                      </button>
+                      <span
+                        className="ct-estimate-tooltip"
+                        id="ct-estimate-tooltip"
+                        role="tooltip"
+                      >
+                        {summaryEstimateMessage}
+                      </span>
+                    </span>
+                  ) : null}
+                </span>
+              )
             : view === "income"
               ? "Ingresos"
               : "Egresos"
@@ -855,8 +1127,20 @@ export default function ContableModule({ view = "summary" }) {
         canCreate={canCreateMovement}
         primaryActionClassName={canCreateMovement ? "contable-create-top" : ""}
         secondaryActions={
-          view === "summary" || compactActions
-            ? []
+          view === "summary"
+            ? [
+                {
+                  key: "summary-detail",
+                  label: "Detalle",
+                  icon: faList,
+                  onClick: () => setSummaryDetailOpen(true),
+                  disabled: loading || !summary,
+                  className:
+                    "mov-btn--primary contable-summary-detail-btn",
+                },
+              ]
+            : compactActions
+              ? []
             : [
                 {
                   key: "excel",
@@ -881,7 +1165,13 @@ export default function ContableModule({ view = "summary" }) {
         />
 
         {view === "summary" ? (
-          <SummaryView summary={summary} loading={loading} mode={summaryMode} />
+          <SummaryView
+            summary={summary}
+            loading={loading}
+            mode={summaryMode}
+            month={month}
+            year={year}
+          />
         ) : (
           <div className="contable-table">
             <GlobalDivTable
@@ -889,6 +1179,10 @@ export default function ContableModule({ view = "summary" }) {
               bodyClassName="entity-table-wrap"
               gridClassName={tableGridClassName}
               columns={tableColumns}
+              loading={loading && !data.items?.length}
+              loadingLabel="Cargando información contable..."
+              skeletonActionCount={2}
+              skeletonRows={8}
               ariaLabel={
                 view === "income" ? "Listado de ingresos" : "Listado de egresos"
               }
@@ -897,7 +1191,6 @@ export default function ContableModule({ view = "summary" }) {
                 <>
                   {!data.items?.length ? (
                     <EmptyState
-                      loading={loading}
                       message="No hubo cobros de socios en el mes seleccionado."
                     />
                   ) : null}
@@ -938,7 +1231,6 @@ export default function ContableModule({ view = "summary" }) {
                 <>
                   {!data.items?.length ? (
                     <EmptyState
-                      loading={loading}
                       message="No hay otros ingresos registrados en el mes."
                     />
                   ) : null}
@@ -1010,7 +1302,6 @@ export default function ContableModule({ view = "summary" }) {
                 <>
                   {!data.items?.length ? (
                     <EmptyState
-                      loading={loading}
                       message="No hay egresos registrados en el mes."
                     />
                   ) : null}
@@ -1137,6 +1428,14 @@ export default function ContableModule({ view = "summary" }) {
           </div>
         )}
       </ModulePage>
+
+      <SummaryDetailModal
+        open={view === "summary" && summaryDetailOpen}
+        onClose={() => setSummaryDetailOpen(false)}
+        summary={summary}
+        year={year}
+        month={month}
+      />
 
       <CrudModal
         open={incomeOpen}
