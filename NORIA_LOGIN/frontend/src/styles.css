@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700&display=swap');
+
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #3a2e2b;
+  background: #fdfbf7;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input { font: inherit; }
+
+.page-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(420px, .9fr);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(196, 139, 59, .16), transparent 32%),
+    radial-gradient(circle at 88% 12%, rgba(58, 46, 43, .08), transparent 28%),
+    linear-gradient(135deg, #ffffff 0%, #fffaf2 52%, #f6ebdc 100%);
+}
+
+.brand-panel,
+.login-panel { display: flex; align-items: center; justify-content: center; padding: clamp(28px, 5vw, 76px); }
+.brand-panel { gap: 34px; }
+.brand-panel > div:last-child { max-width: 620px; }
+
+.brand-mark {
+  position: relative;
+  flex: 0 0 118px;
+  width: 118px;
+  height: 118px;
+  border-radius: 34px;
+  background: #3a2e2b;
+  box-shadow: 0 24px 70px -30px rgba(58, 46, 43, .7);
+}
+.brand-dot { position: absolute; width: 31px; height: 31px; border-radius: 50%; background: #c48b3b; }
+.dot-a { left: 20px; top: 26px; }
+.dot-b { right: 20px; top: 26px; }
+.dot-c { left: 43px; bottom: 20px; width: 34px; height: 34px; background: #fff6e8; }
+
+.eyebrow { margin: 0 0 10px; color: #a46d27; font-weight: 700; font-size: .76rem; letter-spacing: .13em; }
+h1, h2 { margin: 0; font-family: "Plus Jakarta Sans", Inter, sans-serif; letter-spacing: -.045em; }
+h1 { font-size: clamp(2.6rem, 5vw, 5.2rem); line-height: .98; }
+h2 { font-size: 2.25rem; }
+.brand-copy { margin: 22px 0 24px; max-width: 580px; color: #786661; font-size: 1.05rem; line-height: 1.65; }
+.products { display: flex; flex-wrap: wrap; gap: 10px; }
+.products span { padding: 9px 13px; border: 1px solid #e4d5c5; border-radius: 999px; background: rgba(255,255,255,.72); font-size: .86rem; font-weight: 600; }
+
+.login-panel { background: rgba(255,255,255,.34); backdrop-filter: blur(8px); }
+.login-card {
+  width: min(440px, 100%);
+  padding: 34px;
+  border: 1px solid rgba(216, 201, 187, .8);
+  border-radius: 26px;
+  background: rgba(255,255,255,.92);
+  box-shadow: 0 32px 80px -42px rgba(58, 46, 43, .5);
+}
+.heading { margin-bottom: 24px; }
+.heading p:last-child { margin: 12px 0 0; color: #786661; line-height: 1.55; }
+
+label { display: block; margin-top: 16px; color: #5d4e49; font-size: .88rem; font-weight: 600; }
+label > span:first-child { display: inline-block; margin-bottom: 8px; }
+input[type="text"], input[type="password"], label > input:not([type="checkbox"]) {
+  width: 100%; height: 52px; padding: 0 15px; border: 1px solid #e0d5c9; border-radius: 13px; outline: none; background: #fff;
+}
+input:focus { border-color: #c48b3b; box-shadow: 0 0 0 4px rgba(196, 139, 59, .12); }
+.password-row { position: relative; }
+.password-row input { padding-right: 82px; }
+.ghost-button { position: absolute; right: 7px; top: 7px; height: 38px; padding: 0 12px; border: 0; border-radius: 9px; background: #f7f1e8; color: #6a5148; cursor: pointer; }
+.remember-row { display: flex; align-items: center; gap: 9px; font-weight: 500; }
+.remember-row input { width: 17px; height: 17px; }
+.remember-row span { margin: 0 !important; }
+.error-box { margin-top: 16px; padding: 11px 13px; border-radius: 11px; color: #a1262e; background: #fff0f1; border: 1px solid #f4c8cc; font-size: .88rem; }
+.primary-button { width: 100%; height: 52px; margin-top: 20px; border: 0; border-radius: 13px; background: #3a2e2b; color: #fff; font-weight: 700; cursor: pointer; box-shadow: 0 14px 28px -18px rgba(58,46,43,.9); }
+.primary-button:hover { background: #4a3a36; }
+.primary-button:disabled { opacity: .65; cursor: wait; }
+
+@media (max-width: 900px) {
+  .page-shell { grid-template-columns: 1fr; }
+  .brand-panel { padding-bottom: 8px; align-items: flex-end; }
+  .login-panel { padding-top: 22px; }
+  .brand-mark { display: none; }
+  h1 { font-size: clamp(2.2rem, 9vw, 3.4rem); }
+}

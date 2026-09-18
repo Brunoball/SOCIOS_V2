@@ -1,0 +1,41 @@
+RewriteEngine On
+
+# ============================================================
+# SAAS - GATEWAY RAIZ
+# LOGIN en /, productos separados por subcarpeta.
+# ============================================================
+
+# 1) Backends: nunca pasan por los fallbacks SPA.
+RewriteRule ^SAAS_LOGIN/backend(?:/|$) - [L]
+RewriteRule ^SAAS_SOCIOS/backend(?:/|$) - [L]
+RewriteRule ^SAAS_COOPERADORA/backend(?:/|$) - [L]
+
+# 2) SOCIOS - assets reales del build.
+RewriteCond %{DOCUMENT_ROOT}/SAAS_SOCIOS/frontend/build/$1 -f
+RewriteRule ^SAAS_SOCIOS/(.+)$ SAAS_SOCIOS/frontend/build/$1 [L]
+
+# SOCIOS - fallback SPA: /SAAS_SOCIOS/panel, /socios, etc.
+RewriteCond %{DOCUMENT_ROOT}/SAAS_SOCIOS/frontend/build/index.html -f
+RewriteRule ^SAAS_SOCIOS(?:/.*)?$ SAAS_SOCIOS/frontend/build/index.html [L]
+
+# 3) COOPERADORA - assets reales del build.
+RewriteCond %{DOCUMENT_ROOT}/SAAS_COOPERADORA/frontend/build/$1 -f
+RewriteRule ^SAAS_COOPERADORA/(.+)$ SAAS_COOPERADORA/frontend/build/$1 [L]
+
+# COOPERADORA - fallback SPA.
+RewriteCond %{DOCUMENT_ROOT}/SAAS_COOPERADORA/frontend/build/index.html -f
+RewriteRule ^SAAS_COOPERADORA(?:/.*)?$ SAAS_COOPERADORA/frontend/build/index.html [L]
+
+# 4) LOGIN - assets reales del build servido desde la raiz.
+RewriteCond %{DOCUMENT_ROOT}/SAAS_LOGIN/frontend/build/$1 -f
+RewriteRule ^(.+)$ SAAS_LOGIN/frontend/build/$1 [L]
+
+# Entrada principal.
+RewriteCond %{DOCUMENT_ROOT}/SAAS_LOGIN/frontend/build/index.html -f
+RewriteRule ^$ SAAS_LOGIN/frontend/build/index.html [L]
+
+# Fallback SPA del LOGIN.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{DOCUMENT_ROOT}/SAAS_LOGIN/frontend/build/index.html -f
+RewriteRule ^ SAAS_LOGIN/frontend/build/index.html [L]

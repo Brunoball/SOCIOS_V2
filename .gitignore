@@ -1,11 +1,22 @@
-﻿node_modules/
-frontend/node_modules/
-backend/uploads/
-backend/.env
-.env
-vendor/
-dist/
-build/
+﻿# Dependencias
+**/node_modules/
 
-backend/logs/app.log
-backend/logs/*.log
+# Builds generados
+**/build/
+**/dist/
+
+# Variables privadas
+**/.env
+**/.env.local
+**/.env.development
+**/.env.production
+**/.env.playwright
+
+# Logs
+**/*.log
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+NORIA_CONFIG/saas.env

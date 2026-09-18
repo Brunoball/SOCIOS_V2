@@ -1,0 +1,24 @@
+# TERMINAL 1 — BACKEND SOCIOS
+cd "C:\Users\USER\Desktop\SAAS\SAAS_SOCIOS\backend"
+php -S 127.0.0.1:3001 -t .
+
+
+# TERMINAL 2 — BACKEND LOGIN
+cd "C:\Users\USER\Desktop\SAAS\SAAS_LOGIN\backend"
+php -S 127.0.0.1:3011 -t .
+
+
+# TERMINAL 3 — FRONTEND SOCIOS
+cd "C:\Users\USER\Desktop\SAAS\SAAS_SOCIOS\frontend"
+npm start
+
+
+# TERMINAL 4 — FRONTEND LOGIN
+cd "C:\Users\USER\Desktop\SAAS\SAAS_LOGIN\frontend"
+$env:PORT=3010
+npm start
+
+
+usuario: admin_socio
+contraseña: @Socios_2026
+
